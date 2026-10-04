@@ -12,8 +12,10 @@ Room physicalization is configured in `src/game/rooms/physicalRooms.ts`.
 
 Lydia and 221B use the same actor movement, axis sliding, collision checks, depth sorting,
 door animation/state, floor detection, lighting tint, foot shadows, and F3 debug renderer.
-The room art remains the existing source material. Lydia uses its composite bedroom background
-plus extracted foreground crops; 221B keeps its tile floor and configured prop atlas frames.
+Lydia uses its composite bedroom background plus extracted foreground crops. 221B uses a
+room-sized architectural base, an independent furniture atlas, selective configured foreground
+crops, a generated door leaf, and a localized southeast threshold patch. These presentation assets
+do not replace or modify the room's collision, surface, light, or door-state configuration.
 
 ## Add a room
 
@@ -23,7 +25,8 @@ plus extracted foreground crops; 221B keeps its tile floor and configured prop a
 3. Add door definitions as needed. Door state is stored by ID, so a room can have multiple doors.
 4. Add foreground crops for artwork that needs to pass in front of the actor. Configure the
    depth anchor at the object's floor contact edge.
-5. Add any room-specific prop atlas frames to `propVisuals`.
+5. Add any room-specific prop atlas frames to `propVisuals`; keep large furniture that needs
+   depth sorting as independent sprites and put only architecture/fixed lighting in the room base.
 
 `WorldScene` retains two presentation-specific choices: Lydia uses the established 1.5x Holmes
 visual sprite and composite room background; the corridor keeps its existing fallback collision

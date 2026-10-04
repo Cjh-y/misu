@@ -56,15 +56,15 @@ Name: 221B Baker Street sitting room kit
 
 Required By: `src/game/scenes/WorldScene.ts`
 
-Status: Partial — detective-room prop atlas and rainy window are available; room-specific wall tiles and room assembly remain missing
+Status: Implemented for Phase 1.9 — room base, independent furniture atlas, door leaf, and southeast entry architecture patch are integrated. The older shared detective-room atlas remains as source material/fallback.
 
 Priority: P1
 
-Expected File: `public/assets/art/environments/rooms/baker-221b.png`
+Expected Files: `public/assets/art/environments/rooms/221b-room-base.png`, `public/assets/art/props/221b-final-furniture.png`, `public/assets/art/environments/rooms/layers/221b-door-leaf.png`, `public/assets/art/environments/rooms/layers/221b-southeast-entry-patch.png`
 
-Recommended Size: 1280 × 720 equivalent tileset and prop sheet
+Recommended Size: Room base 1536 × 1024 (3:2, for the 480 × 320 world); transparent furniture atlas 1536 × 1024; door leaf 1024 × 1536; localized entry patch 332 × 164
 
-Description: Top-down Victorian sitting room kit supporting the existing 221B opening and its free movement space.
+Description: A 3/4 top-down Victorian detective room reconstruction. The architecture and fixed lighting live in one room base; gameplay furniture, rug and dynamic door remain independently layered. All artwork follows the existing 221B coordinates and collision footprints.
 
 Prompt:
 

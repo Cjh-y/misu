@@ -2,7 +2,7 @@ import type { EvidenceId, GameState, SceneId } from '../types';
 import { SCENES } from '../ids';
 
 export const initialGameState = (): GameState => ({
-  currentScene: SCENES.BAKER_STREET, playerPosition: { x: 160, y: 176 }, discoveredEvidence: [], investigatedObjects: [],
+  currentScene: SCENES.BAKER_STREET, playerPosition: { x: 245, y: 140 }, discoveredEvidence: [], investigatedObjects: [],
   dialogueFlags: {}, storyFlags: {}, dialogueProgress: {}, hypotheses: [], hypothesisState: {}, unlockedLocations: [SCENES.BAKER_STREET],
 });
 

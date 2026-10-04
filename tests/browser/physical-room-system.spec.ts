@@ -29,9 +29,9 @@ test('221B uses the shared physical room system and emits rug surface',async({pa
   await expect.poll(()=>page.evaluate(()=>(window as any).__surface)).toBe('RUG');
   await expect.poll(()=>page.evaluate(()=>(window as any).__surface)).toBe('RUG');
   await page.keyboard.press('F3');
-  await page.screenshot({path:'screenshots/phase-1-8/02-221b-physical-debug.png'});
+  await page.screenshot({path:'screenshots/phase-1-9/02-221b-physical-debug.png'});
   await page.keyboard.press('F3');
-  await page.screenshot({path:'screenshots/phase-1-8/01-221b-physicalized.png'});
+  await page.screenshot({path:'screenshots/phase-1-9/01-221b-final-room.png'});
 });
 
 test('221B fireplace and desk footprints block while open floor remains navigable',async({page})=>{
@@ -58,29 +58,37 @@ test('221B door state controls its threshold collision and permits the open pass
 });
 
 test('221B actor is correctly depth sorted behind and in front of an armchair',async({page})=>{
-  await loadRoom(page,'221b',360,50);
-  await page.screenshot({path:'screenshots/phase-1-8/03-holmes-behind-armchair.png'});
-  await loadRoom(page,'221b',360,142);
-  await page.screenshot({path:'screenshots/phase-1-8/04-holmes-in-front-of-armchair.png'});
+  await loadRoom(page,'221b',66,125);
+  await page.keyboard.down('s');await page.waitForTimeout(120);await page.keyboard.up('s');
+  await page.screenshot({path:'screenshots/phase-1-9/05-holmes-walking-behind-armchair.png'});
+  await loadRoom(page,'221b',66,205);
+  await page.screenshot({path:'screenshots/phase-1-9/06-holmes-in-front-of-armchair.png'});
+});
+
+test('221B Holmes remains discoverable on open wood and on the sitting rug',async({page})=>{
+  await loadRoom(page,'221b',286,210);
+  await page.screenshot({path:'screenshots/phase-1-9/03-holmes-on-wood.png'});
+  await loadRoom(page,'221b',214,178);
+  await page.screenshot({path:'screenshots/phase-1-9/04-holmes-on-rug.png'});
 });
 
 test('221B warm, cool and dark zones produce distinct actor light responses',async({page})=>{
-  await loadRoom(page,'221b',104,120);
+  await loadRoom(page,'221b',104,140);
   await page.evaluate(()=>{(window as any).__light=[];window.addEventListener('misu:light-response',(e:any)=>(window as any).__light.push(e.detail));});
   await expect.poll(()=>page.evaluate(()=>((window as any).__light as any[]).at(-1))).not.toBeUndefined();
   const fireplace=await page.evaluate(()=>((window as any).__light as any[]).at(-1));
-  await page.screenshot({path:'screenshots/phase-1-8/05-holmes-fireplace-light.png'});
+  await page.screenshot({path:'screenshots/phase-1-9/07-holmes-fireplace-light.png'});
   await loadRoom(page,'221b',48,250);
   await page.evaluate(()=>{(window as any).__light=[];window.addEventListener('misu:light-response',(e:any)=>(window as any).__light.push(e.detail));});
   await expect.poll(()=>page.evaluate(()=>((window as any).__light as any[]).at(-1))).not.toBeUndefined();
   const dark=await page.evaluate(()=>((window as any).__light as any[]).at(-1));
   expect(fireplace.warm).toBeGreaterThan(dark.warm);
-  await loadRoom(page,'221b',263,58);
+  await loadRoom(page,'221b',263,130);
   await page.evaluate(()=>{(window as any).__light=[];window.addEventListener('misu:light-response',(e:any)=>(window as any).__light.push(e.detail));});
   await expect.poll(()=>page.evaluate(()=>((window as any).__light as any[]).at(-1))).not.toBeUndefined();
   const windowFill=await page.evaluate(()=>((window as any).__light as any[]).at(-1));
   expect(windowFill.cool).toBeGreaterThan(dark.cool);
-  await page.screenshot({path:'screenshots/phase-1-8/06-holmes-window-light.png'});
+  await page.screenshot({path:'screenshots/phase-1-9/08-holmes-window-light.png'});
 });
 
 test('221B mobile view keeps interaction and doorway touch controls available',async({page})=>{

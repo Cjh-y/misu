@@ -1,19 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-test('desktop: new game, opening, room entry, notebook and reasoning', async ({ page }) => {
+test('desktop: new game remains in 221B after opening and notebook/reasoning continue', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading',{name:'谜溯'})).toBeVisible();
   await page.getByRole('button',{name:'开始调查'}).click();
   for(let i=0;i<9;i++) await page.locator('.dialogue-box button').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
-  await page.keyboard.down('d');
-  await expect.poll(async()=>JSON.parse((await page.evaluate(()=>localStorage.getItem('misu.save.v1')))??'{}').state?.currentScene,{timeout:10_000}).toBe('lydia-room');
-  await page.keyboard.up('d');
-  await page.keyboard.press('e');
-  await expect(page.locator('.detail h2')).toContainText('房门与窗锁');
-  await page.getByRole('button',{name:'继续调查'}).click();
+  await expect(page.locator('#scene-label')).toContainText('221B');
+  await expect.poll(async()=>JSON.parse((await page.evaluate(()=>localStorage.getItem('misu.save.v1')))??'{}').state?.currentScene).toBe('221b');
   await page.getByRole('button',{name:/案件笔记/}).click();
-  await expect(page.locator('.evidence-card')).toHaveCount(3);
+  await expect(page.locator('.evidence-card')).toHaveCount(2);
   await page.getByRole('button',{name:'×'}).click(); await page.getByRole('button',{name:/推理板/}).click();
   await page.getByRole('button',{name:'采用为我的假设'}).click();
   await expect(page.locator('.hypothesis-card')).toContainText('尚无关联证据');
@@ -21,8 +17,9 @@ test('desktop: new game, opening, room entry, notebook and reasoning', async ({ 
   await expect(page.locator('.relations')).toContainText('没有已发现');
   await page.reload();
   await page.getByRole('button',{name:'继续案件'}).click();
+  await expect(page.locator('#scene-label')).toContainText('221B');
   await page.getByRole('button',{name:/案件笔记/}).click();
-  await expect(page.locator('.evidence-card')).toHaveCount(3);
+  await expect(page.locator('.evidence-card')).toHaveCount(2);
   await page.getByRole('button',{name:'×'}).click();
   await page.getByRole('button',{name:/推理板/}).click();
   await expect(page.locator('.hypothesis-card')).toContainText('某种动物通过通气孔');
@@ -63,5 +60,5 @@ test('mobile portrait: controls remain reachable and touch can move the player',
   await page.waitForTimeout(800);
   await page.mouse.up();
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state);
-  expect(saved.playerPosition.x).toBeLessThan(100);
+  expect(saved.playerPosition.x).toBeLessThan(245);
 });

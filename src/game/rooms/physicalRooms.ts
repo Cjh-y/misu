@@ -7,22 +7,24 @@ export interface SurfaceRegion { id:string; surface:RoomSurface; x:number; y:num
 export interface RoomLight { id:string; kind:'warm'|'cool'; x:number; y:number; radius:number; intensity:number }
 export interface DoorDefinition {
   id:string; x:number; y:number; width:number; height:number; depthY:number;
-  interactionRange:number; leafAsset?:'lydiaDoorLeaf'|'tileDoor';
+  interactionRange:number; leafAsset?:'lydiaDoorLeaf'|'tileDoor'|'bakerDoorLeaf';
   leaf?:{x:number;y:number;width:number;height:number;originX?:number;originY?:number;closedRotation:number;openRotation:number};
   initialState:'open'|'closed';
 }
 export interface OcclusionDefinition {
   id:string; x:number; y:number; width:number; height:number; depthY:number;
-  asset:'lydiaPhase16'|'bakerProps'|'lydiaProps'|'interiorTiles';
+  asset:'lydiaPhase16'|'bakerProps'|'bakerRoomProps'|'lydiaProps'|'interiorTiles';
   source:{x:number;y:number;width:number;height:number};
   display?:{x:number;y:number;width:number;height:number};
+  flipX?:boolean;
   alphaMaskAsset?:'lydiaBedFront';
 }
 export interface PropVisual {
-  id:string; asset:'bakerProps'|'bakerWindow'|'lydiaProps';
+  id:string; asset:'bakerProps'|'bakerRoomProps'|'bakerWindow'|'lydiaProps';
   source:{x:number;y:number;width:number;height:number};
   display:{x:number;y:number;width:number;height:number};
   depthY:number;
+  flipX?:boolean;
 }
 export interface PhysicalRoomDefinition {
   scene:SceneId; width:number; height:number; walls:Footprint[]; props:Footprint[];
@@ -64,28 +66,32 @@ const baker:PhysicalRoomDefinition={
   scene:SCENES.BAKER_STREET,width:480,height:320,debugLabel:'221B BAKER STREET',interactionRanges:true,defaultSurface:'WOOD',
   walls:[rect('north-wall',240,8,480,16,16),rect('south-wall-west',214,312,428,16,320),rect('south-wall-east',475,312,10,16,320),rect('west-wall',8,160,16,320,320),rect('east-wall',472,160,16,320,320)],
   props:[
-    rect('fireplace',104,104,74,18,113),rect('armchair-left',360,111,40,34,129),rect('armchair-right',428,151,38,34,168),
+    rect('fireplace',104,104,74,18,113),rect('armchair-left',66,171,42,38,190),rect('armchair-right',178,171,42,38,190),
     rect('desk',122,253,74,30,268),rect('desk-chair',122,284,30,22,295),rect('bookcase',430,126,43,20,136),
-    rect('chemistry-stand',291,249,38,14,256),rect('violin-case',284,116,46,16,124),rect('lamp-table',224,169,22,18,178),
+    rect('chemistry-stand',353,246,42,16,254),rect('violin-case',211,132,38,14,139),rect('lamp-table',122,189,22,18,198),
   ],
-  surfaces:[{id:'central-rug',surface:'RUG',x:204,y:146,width:134,height:76}],
-  lights:[{id:'fireplace-glow',kind:'warm',x:104,y:88,radius:128,intensity:.62},{id:'table-lamp',kind:'warm',x:224,y:158,radius:112,intensity:.68},{id:'rain-window',kind:'cool',x:263,y:58,radius:146,intensity:.2}],
-  // 221B's current prop sheet has no matching door leaf. The room uses the existing
-  // south-east passage as a door entity and a shared atlas leaf; no room art is regenerated.
-  doors:[{id:'221b-entry',x:449,y:310,width:42,height:12,depthY:314,interactionRange:50,leafAsset:'tileDoor',leaf:{x:428,y:310,width:26,height:48,originX:.1,originY:.92,closedRotation:Math.PI/2,openRotation:-Math.PI/2},initialState:'open'}],
+  surfaces:[{id:'central-rug',surface:'RUG',x:30,y:120,width:215,height:112}],
+  lights:[{id:'fireplace-glow',kind:'warm',x:104,y:88,radius:128,intensity:.62},{id:'table-lamp',kind:'warm',x:122,y:174,radius:112,intensity:.68},{id:'rain-window',kind:'cool',x:263,y:58,radius:146,intensity:.2}],
+  // Formal 221B leaf art replaces the temporary shared atlas frame. Geometry and motion stay fixed.
+  doors:[{id:'221b-entry',x:449,y:310,width:42,height:12,depthY:314,interactionRange:50,leafAsset:'bakerDoorLeaf',leaf:{x:428,y:310,width:26,height:48,originX:.1,originY:.92,closedRotation:Math.PI/2,openRotation:-Math.PI/2},initialState:'open'}],
   exits:[rect('baker-street-exit',449,310,42,12,314)],
-  occlusion:[],
+  occlusion:[
+    {id:'armchair-left-front',asset:'bakerRoomProps',source:{x:130,y:220,width:294,height:143},x:37,y:155,width:58,height:32,depthY:190,display:{x:66,y:169,width:58,height:32}},
+    {id:'armchair-right-front',asset:'bakerRoomProps',source:{x:645,y:220,width:286,height:148},x:152,y:152,width:52,height:31,depthY:190,display:{x:178,y:168,width:52,height:31},flipX:true},
+    {id:'desk-front',asset:'bakerRoomProps',source:{x:54,y:580,width:454,height:158},x:74,y:235,width:96,height:34,depthY:268,display:{x:122,y:252,width:96,height:34}},
+    {id:'bookcase-front',asset:'bakerRoomProps',source:{x:1149,y:250,width:252,height:130},x:402,y:118,width:56,height:26,depthY:136,display:{x:430,y:125,width:56,height:26}},
+    {id:'lamp-table-front',asset:'bakerRoomProps',source:{x:650,y:880,width:300,height:138},x:104,y:182,width:36,height:16,depthY:198,display:{x:122,y:190,width:36,height:16}},
+  ],
   propVisuals:[
-    {id:'fireplace',asset:'bakerProps',source:{x:58,y:10,width:565,height:440},display:{x:104,y:77,width:98,height:72},depthY:98},
-    {id:'rain-window',asset:'bakerWindow',source:{x:0,y:0,width:1312,height:1199},display:{x:263,y:55,width:92,height:86},depthY:66},
-    {id:'rug',asset:'lydiaProps',source:{x:449,y:525,width:578,height:294},display:{x:260,y:193,width:132,height:64},depthY:-17.5},
-    {id:'armchair-left',asset:'bakerProps',source:{x:714,y:54,width:348,height:394},display:{x:360,y:91,width:58,height:70},depthY:129},
-    {id:'armchair-right',asset:'bakerProps',source:{x:1108,y:54,width:350,height:402},display:{x:428,y:132,width:52,height:64},depthY:168},
-    {id:'desk',asset:'bakerProps',source:{x:20,y:500,width:525,height:470},display:{x:122,y:231,width:96,height:76},depthY:250},
-    {id:'chemistry',asset:'bakerProps',source:{x:588,y:478,width:302,height:265},display:{x:291,y:234,width:52,height:42},depthY:248},
-    {id:'bookcase',asset:'bakerProps',source:{x:928,y:468,width:322,height:468},display:{x:430,y:100,width:56,height:76},depthY:119},
-    {id:'violin-case',asset:'bakerProps',source:{x:558,y:780,width:360,height:166},display:{x:284,y:111,width:54,height:28},depthY:124},
-    {id:'table-lamp',asset:'bakerProps',source:{x:1272,y:469,width:260,height:292},display:{x:224,y:159,width:36,height:38},depthY:172},
+    {id:'rug',asset:'bakerRoomProps',source:{x:980,y:710,width:550,height:314},display:{x:137.5,y:176,width:215,height:112},depthY:-17.5},
+    {id:'armchair-left',asset:'bakerRoomProps',source:{x:130,y:58,width:294,height:310},display:{x:66,y:151,width:58,height:70},depthY:190},
+    {id:'armchair-right',asset:'bakerRoomProps',source:{x:645,y:58,width:286,height:310},display:{x:178,y:151,width:52,height:64},depthY:190,flipX:true},
+    {id:'desk',asset:'bakerRoomProps',source:{x:54,y:384,width:454,height:354},display:{x:122,y:231,width:96,height:76},depthY:250},
+    {id:'desk-chair',asset:'bakerRoomProps',source:{x:672,y:396,width:220,height:342},display:{x:122,y:274,width:32,height:42},depthY:295},
+    {id:'chemistry',asset:'bakerRoomProps',source:{x:1090,y:370,width:390,height:382},display:{x:353,y:231,width:58,height:42},depthY:254},
+    {id:'bookcase',asset:'bakerRoomProps',source:{x:1149,y:0,width:252,height:386},display:{x:430,y:100,width:56,height:76},depthY:119},
+    {id:'violin-case',asset:'bakerRoomProps',source:{x:80,y:795,width:410,height:190},display:{x:211,y:127,width:50,height:24},depthY:139},
+    {id:'table-lamp',asset:'bakerRoomProps',source:{x:650,y:680,width:300,height:344},display:{x:122,y:179,width:36,height:38},depthY:193},
   ],
 };
 

@@ -20,6 +20,12 @@
 .evidence-detail-art.art-e06{background-position:0 50%}.evidence-detail-art.art-e08{background-position:50% 50%}.evidence-detail-art.art-e09{background-position:100% 50%}
 .evidence-card .icon,.evidence-detail-art{image-rendering:pixelated}
 .nearby:empty{display:none}
+.transition-wrap{position:absolute;inset:0;z-index:12;display:grid;place-items:center;background:#101319f5;opacity:0;transition:opacity .42s ease;pointer-events:all}
+.transition-wrap.active{opacity:1}
+.location-card{text-align:center;padding:22px 34px;border-top:1px solid #a48a5b;border-bottom:1px solid #a48a5b;color:#e8ddc6;text-shadow:0 2px 5px #000}
+.location-card .eyebrow{color:#baa16f;font-size:9px;letter-spacing:.18em}
+.location-card h2{font-size:25px;font-weight:500;letter-spacing:.18em;margin:7px 0;color:#f0dfbd}
+.location-card p:last-child{font-size:12px;color:#b8ad98;margin:0}
 
 /* Title leaf: typography is printed onto the preserved rain-soaked London backdrop. */
 .title-screen{
