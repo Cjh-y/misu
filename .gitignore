@@ -1,0 +1,20 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.DS_Store
+*.tsbuildinfo
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+.cache/
+.vite/
+coverage/

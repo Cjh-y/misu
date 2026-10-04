@@ -1,0 +1,10 @@
+import type { Evidence } from '../../../core/types';
+import { EVIDENCE_IDS, HYPOTHESIS_IDS } from '../../../core/ids';
+
+export const EVIDENCE: Record<string, Evidence> = {
+  [EVIDENCE_IDS.CASE_TESTIMONY]: { id:EVIDENCE_IDS.CASE_TESTIMONY, name:'委托证言与旧案卷宗', description:'艾琳陈述两年前姐姐莉迪亚在婚礼前离世，并交出警方旧调查卷宗。', source:'贝克街 221B · 艾琳', observations:['旧卷宗附有莉迪亚房间的调查图。'], tags:['委托','旧案'], relations:[], icon:'卷' },
+  [EVIDENCE_IDS.HALF_BOTTLE]: { id:EVIDENCE_IDS.HALF_BOTTLE, name:'半瓶睡前药', description:'艾琳昨夜只喝了一半的睡前药。福尔摩斯要求先不要再服用，并带去庄园。', source:'贝克街 221B · 艾琳', observations:['需与庄园原药及房间残液作对照。'], tags:['药物','待检'], relations:[], icon:'瓶' },
+  [EVIDENCE_IDS.DOOR_WINDOW_LOCK]: { id:EVIDENCE_IDS.DOOR_WINDOW_LOCK, name:'房门与窗锁', description:'门闩和窗锁只能在室内扣上；窗框无撬痕。旧调查记录确认案发前门窗关闭，莉迪亚发作后自己开门。', source:'莉迪亚旧房 · 门窗', observations:['凶手不一定要在死亡那一刻进入房间。'], tags:['密室','门窗'], relations:[{kind:'supports',targetId:HYPOTHESIS_IDS.PREEXISTING_DANGER,note:'门窗确实从内侧锁闭，但危险可以在锁门前进入。'}], icon:'锁' },
+  [EVIDENCE_IDS.VENT_MESH]: { id:EVIDENCE_IDS.VENT_MESH, name:'通气孔与细密铁网', description:'孔道通向医生房，两侧都有老化安装漆的完整铁网。放大后可见网孔远小于绳子的粗细。', source:'莉迪亚旧房 · 通气孔', observations:['声音可以通过孔道；以这条绳子为路径的动物无法穿过铁网。','细网与“动物通过通气孔进入”发生冲突。'], tags:['通气孔','反证'], relations:[{kind:'contradicts',targetId:HYPOTHESIS_IDS.ANIMAL_THROUGH_VENT,note:'完整铁网的网孔远小于绳子，无法容纳假设中的动物。'},{kind:'supports',targetId:HYPOTHESIS_IDS.SOUND_THROUGH_VENT,note:'孔道可以传声，但这不证明它能输送动物。'}], icon:'网' },
+  [EVIDENCE_IDS.FALSE_BELL_ROPE]: { id:EVIDENCE_IDS.FALSE_BELL_ROPE, name:'床头假铃绳', description:'新编织绳悬在通气孔旁，没有连着拉铃机构，末端靠近枕头。绳身夹有花斑织带；固定钩旁有新鲜划痕。', source:'莉迪亚旧房 · 床头', observations:['比对旧调查记录附图：两年前房间的床、孔都在，床头却没有这条绳。','一件新物品，正在假扮两年前的凶器。'], tags:['新布置','织带'], relations:[{kind:'contradicts',targetId:HYPOTHESIS_IDS.ANIMAL_THROUGH_VENT,note:'旧调查附图中没有这条绳，绳子是近期添加的，不能证明旧案时动物曾沿绳行动。'},{kind:'supports',targetId:HYPOTHESIS_IDS.STAGED_APPARATUS,note:'新绳、假铃结构和新划痕提示有人近期布置了现场。'}], icon:'绳' },
+};
