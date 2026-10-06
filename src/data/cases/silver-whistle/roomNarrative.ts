@@ -33,7 +33,9 @@ export interface WorldActorDefinition {
 
 export const WATSON_ACTOR: WorldActorDefinition = {
   id: 'watson', scene: SCENES.BAKER_STREET, texture: 'watson-sheet', idleFrame: 'watson-south-0',
-  x: 209, feetY: 166, width: 43.2, height: 64.8, collisionWidth: 10, collisionHeight: 8,
+  // The sprite is alpha-trimmed at load and scaled uniformly to Holmes's 51.6-unit
+  // world height; the compact footprint remains a separate 10 × 8 floor contact.
+  x: 209, feetY: 166, width: 28.9, height: 51.6, collisionWidth: 10, collisionHeight: 8,
   lightResponse: true, presenceFlag: 'openingComplete',
 };
 

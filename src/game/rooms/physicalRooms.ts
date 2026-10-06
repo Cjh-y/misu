@@ -13,14 +13,13 @@ export interface DoorDefinition {
 }
 export interface OcclusionDefinition {
   id:string; x:number; y:number; width:number; height:number; depthY:number;
-  asset:'lydiaPhase16'|'bakerProps'|'bakerRoomProps'|'lydiaProps'|'interiorTiles';
+  asset:'bakerProps'|'bakerRoomProps'|'interiorTiles';
   source:{x:number;y:number;width:number;height:number};
   display?:{x:number;y:number;width:number;height:number};
   flipX?:boolean;
-  alphaMaskAsset?:'lydiaBedFront';
 }
 export interface PropVisual {
-  id:string; asset:'bakerProps'|'bakerRoomProps'|'bakerWindow'|'lydiaProps';
+  id:string; asset:'bakerProps'|'bakerRoomProps'|'bakerWindow';
   source:{x:number;y:number;width:number;height:number};
   display:{x:number;y:number;width:number;height:number};
   depthY:number;
@@ -28,6 +27,7 @@ export interface PropVisual {
 }
 export interface PhysicalRoomDefinition {
   scene:SceneId; width:number; height:number; walls:Footprint[]; props:Footprint[];
+  walkableBounds?:{x:number;y:number;width:number;height:number};
   surfaces:SurfaceRegion[]; defaultSurface:RoomSurface; lights:RoomLight[];
   doors:DoorDefinition[]; exits:Footprint[]; occlusion:OcclusionDefinition[]; propVisuals:PropVisual[];
   interactionRanges:boolean; debugLabel:string;
@@ -37,29 +37,15 @@ const rect=(id:string,x:number,y:number,width:number,height:number,depthY=y+heig
 
 const lydia:PhysicalRoomDefinition={
   scene:SCENES.LYDIA_ROOM,width:480,height:320,debugLabel:'LYDIA BEDROOM',interactionRanges:true,defaultSurface:'WOOD',
-  walls:[
-    rect('north-wall',240,8,480,16,16),rect('south-wall',240,312,480,16,320),rect('east-wall',472,160,16,320,320),
-    rect('west-wall-north',8,91,16,150,166),rect('west-wall-south',8,287,16,50,312),
-  ],
-  props:[
-    rect('washstand',69,134,42,24,151),rect('bedside-table',230,99,26,28,113),rect('bed',278,118,66,83,171),
-    rect('wardrobe',408,91,48,24,112),rect('mirror-base',451,184,16,12,192),rect('desk',406,257,46,28,273),
-    rect('chair',365,248,24,28,265),rect('safe',445,274,26,22,286),
-  ],
+  // Logical X/Z collision lives in game/world/lydiaWorldRoom.ts; no pixel rectangles are authoritative here.
+  walls:[],props:[],
   surfaces:[{id:'bed-rug',surface:'RUG',x:214,y:113,width:118,height:72}],
   lights:[{id:'bedside-lamp',kind:'warm',x:228,y:70,radius:128,intensity:.88},{id:'window',kind:'cool',x:154,y:42,radius:150,intensity:.22}],
   doors:[{id:'bedroom-entry',x:39,y:216,width:12,height:68,depthY:250,interactionRange:48,leafAsset:'lydiaDoorLeaf',leaf:{x:106/3.2,y:548/3.2,width:105/3.2,height:280/3.2,originX:6/105,originY:8/280,closedRotation:0,openRotation:.92},initialState:'open'}],
   exits:[rect('manor-hall-exit',39,216,12,68,250)],
-  occlusion:[
-    {id:'washstand-front',asset:'lydiaPhase16',source:{x:105,y:365,width:205,height:115},x:105/3.2,y:365/3.2,width:205/3.2,height:115/3.2,depthY:151},
-    {id:'bedside-front',asset:'lydiaPhase16',source:{x:660,y:285,width:125,height:125},x:660/3.2,y:285/3.2,width:125/3.2,height:125/3.2,depthY:120},
-    {id:'bed-front',asset:'lydiaPhase16',source:{x:750,y:425,width:230,height:150},x:750/3.2,y:425/3.2,width:230/3.2,height:150/3.2,depthY:174,alphaMaskAsset:'lydiaBedFront'},
-    {id:'wardrobe-front',asset:'lydiaPhase16',source:{x:1170,y:265,width:270,height:125},x:1170/3.2,y:265/3.2,width:270/3.2,height:125/3.2,depthY:116},
-    {id:'mirror-front',asset:'lydiaPhase16',source:{x:1350,y:505,width:145,height:135},x:1350/3.2,y:505/3.2,width:145/3.2,height:135/3.2,depthY:197},
-    {id:'chair-front',asset:'lydiaPhase16',source:{x:1095,y:650,width:205,height:155},x:1095/3.2,y:650/3.2,width:205/3.2,height:155/3.2,depthY:270},
-    {id:'desk-front',asset:'lydiaPhase16',source:{x:1175,y:800,width:350,height:135},x:1175/3.2,y:800/3.2,width:350/3.2,height:135/3.2,depthY:284},
-    {id:'safe-front',asset:'lydiaPhase16',source:{x:1350,y:810,width:175,height:140},x:1350/3.2,y:810/3.2,width:175/3.2,height:140/3.2,depthY:291},
-  ],propVisuals:[],
+  // Lydia furniture is rendered exclusively from LYDIA_SCENE_GRAPH. No full-object
+  // background props or per-furniture crop masks are registered in this room definition.
+  occlusion:[],propVisuals:[],
 };
 
 const baker:PhysicalRoomDefinition={
@@ -95,9 +81,34 @@ const baker:PhysicalRoomDefinition={
   ],
 };
 
+const hall:PhysicalRoomDefinition={
+  scene:SCENES.HALL,width:720,height:320,debugLabel:'MANOR CORRIDOR',interactionRanges:false,defaultSurface:'WOOD',
+  walls:[
+    rect('north-boundary',360,8,720,16,16),rect('south-boundary',360,312,720,16,320),rect('east-boundary',712,160,16,320,320),
+    rect('west-wall-upper',8,68,16,120,128),rect('west-wall-lower',8,252,16,136,320),
+    // Interior wall band and the thick side walls of Lydia's existing recessed approach.
+    rect('north-wall-west',96,57,160,80,97),rect('north-wall-center',314,57,136,80,97),
+    rect('north-wall-east-a',484,57,112,80,97),rect('north-wall-east-b',644,57,120,80,97),
+    rect('lydia-recess-west-jamb',178,130,14,68,164),rect('lydia-recess-east-jamb',250,130,14,68,164),
+  ],
+  props:[
+    rect('static-door-a',405,91,38,12,100),rect('static-door-b',565,91,38,12,100),
+    rect('gallery-console',650,133,42,16,145),
+  ],
+  surfaces:[
+    {id:'lydia-threshold-rug',surface:'RUG',x:183,y:151,width:54,height:21},
+  ],
+  lights:[
+    {id:'west-sconce',kind:'warm',x:111,y:76,radius:132,intensity:.42},
+    {id:'lydia-approach-sconce',kind:'warm',x:279,y:92,radius:126,intensity:.50},
+    {id:'gallery-sconce',kind:'warm',x:515,y:76,radius:122,intensity:.38},
+  ],
+  doors:[],exits:[],occlusion:[],propVisuals:[],
+};
+
 export const PHYSICAL_ROOMS:Record<SceneId,PhysicalRoomDefinition>={
   [SCENES.BAKER_STREET]:baker,
-  [SCENES.HALL]:{scene:SCENES.HALL,width:720,height:320,debugLabel:'MANOR CORRIDOR',walls:[],props:[],surfaces:[],defaultSurface:'WOOD',lights:[],doors:[],exits:[],occlusion:[],propVisuals:[],interactionRanges:false},
+  [SCENES.HALL]:hall,
   [SCENES.LYDIA_ROOM]:lydia,
 };
 

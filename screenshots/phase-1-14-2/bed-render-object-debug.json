@@ -1,0 +1,49 @@
+{
+  "objectId": "bed",
+  "baseVisualOwner": "room-base texture (contains the only complete bed)",
+  "occluder": "transparent headboard/back and footboard/front crops only",
+  "worldFootprint": {
+    "x": 5.1,
+    "z": 0.74,
+    "width": 1.55,
+    "depth": 2.42
+  },
+  "worldPosition": {
+    "x": 5.875,
+    "y": 0,
+    "z": 1.95
+  },
+  "occlusionDepths": [
+    { "id": "bed-back", "frontZ": 0.74 },
+    { "id": "bed-front", "frontZ": 3.16 }
+  ],
+  "renderDepth": {
+    "base": -19,
+    "bedBack": 4074,
+    "bedFront": 4316
+  },
+  "duplicateFullVisual": false,
+  "renderObjects": [
+    {
+      "name": "room-base:lydia-bedroom",
+      "texture": "lydia-bedroom-phase16",
+      "frame": "__BASE",
+      "depth": -19,
+      "bounds": { "x": 0, "y": 0, "width": 480, "height": 320 }
+    },
+    {
+      "name": "occlusion:bed-back",
+      "texture": "lydia-bedroom-bed-back-occluder",
+      "frame": "__BASE",
+      "depth": 4074,
+      "bounds": { "x": 236.875, "y": 46.875, "width": 62.5, "height": 93.75 }
+    },
+    {
+      "name": "occlusion:bed-front",
+      "texture": "lydia-bedroom-bed-front",
+      "frame": "__BASE",
+      "depth": 4316,
+      "bounds": { "x": 233.75, "y": 132.5, "width": 71.875, "height": 46.875 }
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import { EVIDENCE } from '../../src/data/cases/silver-whistle/evidence';
 import { OPENING_DIALOGUE } from '../../src/data/cases/silver-whistle/dialogues';
 import { canShowDialogueLine, completeDialogueLine } from '../../src/systems/dialogue/dialogue';
 import { loadGame, resetSave, saveGame, SAVE_KEY } from '../../src/core/save/save';
+import { canCharacterPassClearance, findLydiaCollision, isWithinGroundFootprint, LYDIA_FURNITURE_GROUPS, LYDIA_PLAYER_COLLISION_VOLUME, LYDIA_RUG_FOOTPRINT, LYDIA_WORLD_ENTITIES, overlapsGround } from '../../src/game/world/lydiaWorldRoom';
 
 function memoryStorage(){const values=new Map<string,string>();return {getItem:(k:string)=>values.get(k)??null,setItem:(k:string,v:string)=>values.set(k,v),removeItem:(k:string)=>values.delete(k)};}
 
@@ -37,4 +38,59 @@ describe('data driven dialogue',()=>{
 describe('save system',()=>{
  it('round trips state and hypotheses',()=>{const storage=memoryStorage();let s=createHypothesis(initialGameState(),'可能有人预先带入危险',100);s=discoverEvidence(s,'E09');saveGame(s,storage,500);expect(loadGame(storage)).toEqual(s);});
  it('handles corrupt data and resets save',()=>{const storage=memoryStorage();storage.setItem(SAVE_KEY,'{broken');expect(loadGame(storage)).toBeNull();let s=initialGameState();saveGame(s,storage);resetSave(storage);expect(loadGame(storage)).toBeNull();});
+});
+
+describe('Lydia ground footprint geometry',()=>{
+ it('supports polygon footprints without blocking empty corners of their bounds',()=>{
+  const wedge={id:'wedge',x:1,z:1,width:2,depth:2,polygon:[{x:0,z:0},{x:2,z:0},{x:0,z:2}]};
+  expect(overlapsGround({x:2.8,z:2.8,width:.2,depth:.2},wedge)).toBe(false);
+  expect(overlapsGround({x:1.2,z:1.5,width:.2,depth:.2},wedge)).toBe(true);
+ });
+ it('uses group anchors and a separate standing body volume for room geometry',()=>{
+  const bed=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='bed')!;
+  const nightstand=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='nightstand')!;
+  const rug=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='rug')!;
+  const sleeping=LYDIA_FURNITURE_GROUPS.find(group=>group.id==='sleeping')!;
+  expect(nightstand.position.x).toBeCloseTo(bed.position.x+sleeping.offsets.nightstand.x);
+  expect(rug.position.x).toBeCloseTo(bed.position.x+sleeping.offsets.rug.x);
+  expect(LYDIA_PLAYER_COLLISION_VOLUME.height).toBeGreaterThan(1.8);
+  expect(isWithinGroundFootprint({x:rug.footprint.x+.1,z:rug.footprint.z+.1},LYDIA_RUG_FOOTPRINT)).toBe(true);
+ });
+ it('blocks the standing character body against desk occupied volumes, not only its floor footprint',()=>{
+  const desk=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='desk')!;
+  const hit=findLydiaCollision({x:desk.position.x,z:desk.position.z},false);
+  expect(hit).toMatchObject({id:'desk',kind:'furniture'});
+  expect(desk.occupiedVolumes.map(volume=>volume.id)).toEqual(['desk-tabletop','desk-drawer-bank','desk-left-support','desk-right-support']);
+  expect(desk.clearanceVolumes?.[0].freeHeight).toBeLessThan(LYDIA_PLAYER_COLLISION_VOLUME.height);
+  expect(canCharacterPassClearance(LYDIA_PLAYER_COLLISION_VOLUME.height,desk.clearanceVolumes![0].freeHeight)).toBe(false);
+  expect(canCharacterPassClearance(.72,desk.clearanceVolumes![0].freeHeight)).toBe(true);
+  expect(findLydiaCollision({x:desk.position.x,z:desk.position.z},false,{width:.25,depth:.25,height:.4})).toBeUndefined();
+ });
+ it('keeps bed, wardrobe, wall, and washstand volumes solid while leaving the center route open',()=>{
+  const bed=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='bed')!;
+  const wardrobe=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='wardrobe')!;
+  const washstand=LYDIA_WORLD_ENTITIES.find(entity=>entity.id==='washstand')!;
+  expect(findLydiaCollision({x:bed.position.x,z:bed.position.z})?.id).toBe('bed');
+  expect(findLydiaCollision({x:wardrobe.position.x,z:wardrobe.position.z})?.id).toBe('wardrobe');
+  expect(findLydiaCollision({x:washstand.position.x,z:washstand.position.z})?.id).toBe('washstand');
+  expect(findLydiaCollision({x:9.4,z:2.24})?.id).toBe('mirror');
+  expect(findLydiaCollision({x:5.1,z:4.9})).toBeUndefined();
+  expect(findLydiaCollision({x:7.35,z:4.8})).toBeUndefined();
+  expect(findLydiaCollision({x:7.35,z:4.4775})).toBeUndefined();
+  expect(findLydiaCollision({x:7.35,z:4.513333333333331})).toBeUndefined();
+ });
+ it('has a continuous legal route from the lower-left room to the upper-right past the furniture groups',()=>{
+  const step=.15,start={x:1.9,z:4.75},goal={x:8.15,z:2.8};
+  const key=(x:number,z:number)=>`${Math.round(x/step)},${Math.round(z/step)}`;
+  const queue=[start],seen=new Set([key(start.x,start.z)]);let found=false;
+  for(let i=0;i<queue.length;i++){
+   const current=queue[i];if(Math.hypot(current.x-goal.x,current.z-goal.z)<.23){found=true;break;}
+   for(const [dx,dz] of [[step,0],[-step,0],[0,step],[0,-step],[step,step],[step,-step],[-step,step],[-step,-step]]){
+    const next={x:current.x+dx,z:current.z+dz},id=key(next.x,next.z);
+    if(seen.has(id)||findLydiaCollision(next))continue;
+    seen.add(id);queue.push(next);
+   }
+  }
+  expect(found).toBe(true);
+ });
 });

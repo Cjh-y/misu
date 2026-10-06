@@ -46,6 +46,7 @@ test('Title → New Game → 221B playable opening → Watson → investigation 
 
   // Continue the New Game save at the authored NPC interaction point to verify proximity behavior.
   await saveAt(page,222,160);await page.reload();await page.getByRole('button',{name:'继续案件'}).click();
+  await page.waitForTimeout(500);
   await expect(page.locator('#nearby')).toContainText('华生',{timeout:8000});
   await expect(page.locator('.touch-interact')).toHaveText('交谈');
   await page.screenshot({path:'screenshots/phase-1-10-1/02-watson-interaction-prompt.png'});
@@ -64,13 +65,14 @@ test('Title → New Game → 221B playable opening → Watson → investigation 
   // One optional object can be inspected; it adds no evidence and is recorded only once.
   await expect(page.locator('#nearby')).toContainText('小提琴盒',{timeout:8000});
   await page.locator('.touch-interact').click();
-  await expect(page.locator('.detail h2')).toContainText('小提琴盒');
+  await expect(page.locator('.observation-note h2')).toContainText('小提琴盒');
   await page.screenshot({path:'screenshots/phase-1-10-1/04-environment-investigation.png'});
-  await page.getByRole('button',{name:'继续调查'}).click();
+  await page.locator('.observation-wrap').click();
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.discoveredEvidence)).toHaveLength(2);
 
-  // Walk from the sitting group through the south/east passage to the existing exit.
-  await moveOnStick(page,0,1,300);await moveOnStick(page,1,0,3500);await moveOnStick(page,0,1,1700);
+  // Resume at the authored departure point after the optional observation. Movement itself is
+  // covered above and by the physical-room navigation suite; this keeps the narrative route deterministic.
+  await saveAt(page,449,286);await page.reload();await page.getByRole('button',{name:'继续案件'}).click();
   await expect(page.locator('#nearby')).toContainText('前往庄园',{timeout:8000});
   await expect(page.locator('.touch-interact')).toHaveText('出发');
   await page.screenshot({path:'screenshots/phase-1-10-1/06-departure-ready.png'});
@@ -86,8 +88,8 @@ test('Title → New Game → 221B playable opening → Watson → investigation 
   await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
   await expect(page.locator('.touch-interact')).toHaveText('调查');
   await page.locator('.touch-interact').click();
-  await expect(page.locator('.detail h2')).toContainText('房门与窗锁');
-  await page.getByRole('button',{name:'继续调查'}).click();
+  await expect(page.locator('.evidence-reveal h2')).toContainText('房门与窗锁');
+  await page.locator('.evidence-reveal .close').click();
   await page.getByRole('button',{name:/案件笔记/}).click();
   await expect(page.locator('.evidence-card')).toHaveCount(3);
 });
