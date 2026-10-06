@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "build:standalone": "npm run build && node scripts/build-standalone.mjs",
     "test": "vitest run tests/unit",
     "test:watch": "vitest tests/unit",
     "test:browser": "playwright test",
