@@ -1,87 +1,85 @@
-# 谜溯项目交接
+# Codex / Agent 工作交接 —《谜溯：银哨之后》
 
-交接基准：`codex/rebuild` 分支，提交 `7d96f44`（`Add downloadable standalone game HTML`）。该提交与 `origin/codex/rebuild` 一致；开始新工作前先执行 `git status` 和 `git log` 确认仓库状态。
+这是一份给接手本仓库的 Codex 或其他编码 Agent 的运行上下文与工作约束，不是面向一般开发者的项目介绍。请先读完，再响应用户的下一条具体任务。
 
-## 项目现状
+## 接手起点
 
-《谜溯：银哨之后》是 TypeScript、Phaser 3、Vite 实现的浏览器叙事推理游戏切片。当前可玩路线为：
+- 仓库：`https://github.com/Cjh-y/misu`
+- 工作分支：`codex/rebuild`
+- 交接文档同步前的代码基准：`7d96f44`；其后只有交接文档提交。**每次接手仍须读取实际远端 HEAD、当前分支和 `git status`，以仓库最新提交为准。** 不恢复旧 Codex Task，不假定工作区与本文件编写时相同。
+- 用户当前主要通过手机使用项目，无法在手机上执行 Node/npm 脚本。仓库根目录有已构建的 `misu-standalone.html`，用户需要时可从 GitHub 下载。
+- 眼下没有待执行的剧情、美术或房间重构任务。不要把交接文档理解成开始下一阶段的授权；按用户下一条明确指令行动。
+
+## 协作要求
+
+1. 开始改动前检查 `git status`、当前分支、最新 commits 和相关代码/文档；不要从历史对话记忆替代仓库事实。
+2. 用户通常会明确说明阶段范围和禁止项。遵守当前最新指令；不要擅自扩写剧情、证据、房间或系统，也不要把用户已验收的场景推倒重做。
+3. 先完成用户授权范围内的工作，再报告结果。只有用户要求推送时才提交/推送；此前的推送授权不自动延伸到未来工作。
+4. 绝不要把聊天中的访问令牌复制进源码、文档、Git remote URL、命令输出或提交。远端认证优先使用环境已有的安全凭据。
+5. 不要声称完整回归通过，除非确实运行并记录了对应测试。当前阶段构建成功不代表浏览器回归已通过。
+
+## 当前实现快照
+
+当前游戏切片的真实可玩路线为：
 
 ```text
-Title → 221B 开场九句对白 → 221B 自由探索 / Watson 对话
-     → 庄园走廊 → Lydia Bedroom → E06 / E08 / E09 调查
+Title
+→ 221B 九句 opening dialogue
+→ 221B 自由探索、与 Watson 对话、少量环境观察
+→ 东南出口出发
+→ Manor Corridor
+→ Lydia Bedroom
+→ 调查 E06 / E08 / E09，使用案件笔记与推理板
 ```
 
-案件数据中还包括开场获得的 E01、E02、证据关系、假设、案件笔记、推理板和 Continue 存档。当前内容是可玩切片，不是完整案件章节。
+案件数据还包括 opening 获取的 E01/E02、证据关系、假设和 Continue 存档。项目仍是可玩案件切片，不是完整案件章节。
 
-## 阶段状态
+已实现且应当保留的阶段结果：
 
-- **221B / Phase 1.9–1.10.2**：场景美术与构图已完成；保留家具碰撞、遮挡、地毯、门和室内光照。Phase 1.10.1 加入 Watson 世界角色、短交谈、少量环境调查及前往庄园流程；1.10.2 调整对白、观察、证据、地点卡和笔记界面。
-- **Manor Corridor / Phase 1.11–1.11.2**：完成走廊空间重建和构图、地毯透视/门槛整合、人物比例检查；与 Bedroom 的路线和 Lydia 入口保持可用。
-- **Lydia Bedroom / Phase 1.12–1.16**：E06、E08、E09 调查与回廊流程保留；逐步加入碰撞稳定性、World X/Y/Z 与 floor projection、家具 scene graph / occupied volumes / clearance、相机锁定家具资产和 F7/F8 开发检查。
-- **单文件分发**：`npm run build:standalone` 生成 `dist/misu-standalone.html`；仓库根目录的 `misu-standalone.html` 是已上传的可下载版本。
+- **221B（Phase 1.9–1.10.2）**：正式房间美术、家具分布、碰撞、门、地毯、遮挡、灯光和 Holmes 可读性；Watson 作为世界角色加入，具备短交谈；可调查少量环境对象并从出口前往庄园；叙事 UI 已做轻量化。
+- **Manor Corridor（Phase 1.11–1.11.2）**：走廊建筑表现、节奏与视觉主次调整；地毯透视、门槛和角色比例问题已处理；保留门到场景的功能映射。
+- **Lydia Bedroom（Phase 1.12–1.16）**：调查 E06/E08/E09；稳定碰撞与反复进出；world X/Y/Z、地板投影、家具 Scene Graph、occupied volumes/clearance、统一深度关系、F7 体积示意和 F8 相机轴检查；相机锁定家具 PNG 与视觉审查记录。
+- Lydia Bedroom 是唯一使用 world-space 2.5D Scene Graph 的参考房间。**221B 和 Manor Corridor 没有迁移到该模型**；不要自行推广。
 
-Lydia Bedroom 是当前 world-space / 2.5D scene graph 验证房间。**221B 和 Manor Corridor 尚未迁移到该模型**，仍使用 `WorldScene` 和 `physicalRooms.ts` 中的共享 2D 屏幕空间房间物理配置。不要在未获授权时把迁移范围扩大到其他房间。
+Phase 1.16 的资产和实现已经在仓库，但不要仅凭已有截图/代码推断用户已完成最终视觉验收。继续之前应以用户最新反馈为准。
 
 ## 重要代码入口
 
-| 文件 | 职责 |
+| 文件 | 接手时关注点 |
 |---|---|
-| `src/main.ts` | UI、New Game/Continue、对白、观察、笔记、推理、存档及场景流程协调 |
-| `src/game/scenes/WorldScene.ts` | Phaser 场景生命周期、玩家输入、角色/道具渲染、房间切换和调试视图 |
-| `src/game/rooms/physicalRooms.ts` | 221B、Manor Corridor、Lydia 的物理房间配置；Lydia 的权威 world collision 数据在 world 模块 |
-| `src/game/world/WorldProjection.ts` | Lydia world 与屏幕坐标投影 |
-| `src/game/world/lydiaWorldRoom.ts` | Lydia 房间相机参数、建筑、家具组、实体、脚印、occupied volumes、交互位置 |
-| `src/game/world/sceneGraph3D.ts` | 场景实体、体积和深度/遮挡关系数据结构与工具 |
-| `src/data/cases/silver-whistle/` | 开场对白、Watson 对话、221B 环境互动、证据、交互对象和推理关系 |
-| `src/data/art/assetManifest.ts` | 正式美术资源键值和路径 |
-| `src/core/save/save.ts` | Continue 存档；若本地文件浏览器不允许 `localStorage`，会退到当前页面生命周期内的内存存储 |
-| `scripts/build-standalone.mjs` | 将 Vite JS/CSS 和游戏 PNG 内嵌到单个 HTML |
+| `src/main.ts` | New Game/Continue、对白与观察 UI、笔记/推理、交互分发、存档和场景推进 |
+| `src/game/scenes/WorldScene.ts` | Phaser 场景、角色与 Watson、输入、碰撞、渲染、调试层、门和切换 |
+| `src/game/rooms/physicalRooms.ts` | 221B 与走廊的房间尺寸、footprints、表面、灯光、门、遮挡和家具视觉配置 |
+| `src/game/world/WorldProjection.ts` | Lydia Bedroom 的 world-to-screen 投影 |
+| `src/game/world/lydiaWorldRoom.ts` | Lydia world 尺寸、唯一相机基准、布局组、实体、footprint、occupied volume 和互动位置 |
+| `src/game/world/sceneGraph3D.ts` | Lydia 实体/体积/深度关系模型 |
+| `src/data/cases/silver-whistle/` | 剧情对白、Watson 和环境互动、E01/E02/E06/E08/E09、证据和推理数据 |
+| `src/core/save/save.ts` | Continue 持久化；本地 `file://` 无法访问 Storage 时用内存 fallback，不能保证刷新后保留存档 |
+| `src/data/art/assetManifest.ts` | 游戏资源键和值；新增资源接入时检查实际路径与 preload |
+| `scripts/build-standalone.mjs` | 从 Vite 输出生成无外部资源引用的单文件 HTML |
 
-## 运行方式
+## 手机单文件交付
 
-开发环境（Node.js 20.19+ 或 22.12+）：
+- 构建命令：`npm run build:standalone`。
+- 构建输出：`dist/misu-standalone.html`。
+- GitHub 下载副本：仓库根目录 `misu-standalone.html`。
+- 当前下载副本约 **59.05 MiB**，内嵌 32 张 PNG。GitHub 已接受该文件，但提示大于其建议的 50 MiB；小于 100 MiB 单文件上限。
+- 修改源码或资源后，如用户需要更新手机文件，须重建、检查生成结果、将新的 `dist/misu-standalone.html` 同步到仓库根目录，再按用户要求提交推送。不要只更新构建脚本而忘记下载副本。
+- 目前构建器把 JS/CSS 和所有被代码引用的 PNG 内嵌；构建结果曾通过 HTML 结构检查，确认无外部脚本、样式表或图像 URL。
+- 手机浏览器是否允许直接执行下载的 `file://` HTML 因平台而异。若目标浏览器禁止运行脚本，单文件本身不能绕过限制，需要用户授权后改用 HTTPS 托管。
 
-```sh
-npm install
-npm run dev
-```
+## 最近验证记录
 
-常用验证命令：
+- 在 `85ad186` 之后运行过 `npm run build:standalone`：TypeScript 检查与 Vite 生产构建成功；生成约 59.1 MiB 文件，HTML 检查结果为一个内联脚本、一个内联样式表、无外部资源引用。
+- 这不是目标手机上的实际运行验收。没有在最近单文件更新后运行完整 Vitest/Playwright 套件。
+- 相关验证命令：`npm test`、`npm run build`、`npm run test:browser`（需先安装 Playwright Chromium）。按实际改动运行对应检查，并准确汇报范围。
 
-```sh
-npm test
-npm run build
-npx playwright install chromium
-npm run test:browser
-```
+## 历史文档陷阱
 
-单文件 HTML：
+- `NARRATIVE_RUNTIME_AUDIT.md` 是 Phase 1.10.1 实施前的审计，其中“Watson 未入场”“221B 无自由探索”等描述已经过时。当前行为以最新 `src/main.ts`、`WorldScene.ts` 和 `roomNarrative.ts` 为准。
+- `ART_ASSET_REQUESTS.md`、`VISUAL_BIBLE.md`、各房间 Reconstruction Plan 包含各自阶段的历史要求。若与后续用户指令、现代码或正式资源冲突，不要把旧计划直接当成当前授权。
+- Lydia Bedroom 的屏幕坐标 `playerPosition` 在旧场景和存档兼容中仍存在；Bedroom authoritative position 是 `playerWorldPosition3D`。不得由 sprite 屏幕坐标反推其真实 world position。
 
-```sh
-npm run build:standalone
-```
+## 建议的接手动作
 
-生成 `dist/misu-standalone.html`。更新游戏代码或图片后，需要重新生成，并将新的单文件复制到仓库根目录再提交，才能更新 GitHub 上的下载版本。当前 `misu-standalone.html` 约 59.05 MiB，GitHub 接受了推送，但给出了超过 50 MiB 推荐大小的警告。该 HTML 没有外部资源引用；直接用手机打开是否可运行仍取决于手机浏览器是否允许 `file://` 页面执行脚本。受限浏览器需要 HTTPS 托管。若浏览器屏蔽本地存储，存档只在当前页面运行期间有效。
-
-## 当前验证记录与限制
-
-- 最新代码执行过 `npm run build:standalone`，TypeScript 检查和 Vite production build 成功；构建器生成约 59.1 MiB 的 HTML，内嵌 32 张 PNG。HTML 结构检查确认没有外部脚本或样式表引用。
-- 上述单文件构建不等于在目标手机浏览器完成了运行验收；下一次接手时应先在实际设备下载并打开根目录单文件，确认启动、New Game、画面资源、交互和存档行为。
-- 没有在单文件构建提交后运行整个 Vitest / Playwright 套件。开展代码修改后，按改动范围运行对应验证；不要把构建成功写成全回归通过。
-- `NARRATIVE_RUNTIME_AUDIT.md` 是 Phase 1.10.1 之前的历史审计，关于 Watson 未入场、221B 无自由探索等结论已过时。判断现状以当前代码和实际运行结果为准。
-- `ART_ASSET_REQUESTS.md`、`VISUAL_BIBLE.md` 与各房间重建计划含有历史阶段记录；若文字和当前实现有差异，以最新代码、资源及用户明确的阶段约束为准。
-
-## 设计与验收文档
-
-- `README.md`：面向开发者与玩家的项目简介和命令。
-- `SCENE_PHYSICALIZATION_SYSTEM.md`、`SCENE_PHYSICALIZATION_TESTS.md`：房间物理配置和手动验收路线。
-- `LYDIA_CAMERA_LOCKED_ASSET_AUDIT.md`：Lydia Bedroom 相机与家具素材基准。
-- `221B_ART_RECONSTRUCTION_PLAN.md`、`221B_COMPOSITION_PLAN.md`：221B 视觉和构图决策。
-- `MANOR_CORRIDOR_RECONSTRUCTION_PLAN.md`：走廊空间重建记录。
-- `screenshots/phase-*`：各阶段截图，作为历史验收资料，不代表当前设备上的实时渲染结果。
-
-## 继续工作的建议顺序
-
-1. 先在手机实际下载并打开 `misu-standalone.html`。若本地文件被浏览器禁止执行，讨论 HTTPS 托管方式；不要先改游戏玩法或空间布局。
-2. 若单文件需要更新，运行 `npm run build:standalone`，核对实际 HTML 后同步根目录下载文件。
-3. 新一轮游戏功能或美术阶段开始前，重新检查当前 branch、status、最新提交和对应房间配置。当前没有在本交接文档中授权新的剧情、房间迁移或案件扩写。
+收到下一项工作后，先确认具体范围和用户验收要求；随后检查相关实现和测试。若用户继续处理单文件手机运行问题，优先在实际目标浏览器验证下载文件；若暂时无法验证，应明确说明这一点，不要把静态检查当作设备验收。除此之外，等待用户明确指定下一阶段，不主动扩建游戏内容。
