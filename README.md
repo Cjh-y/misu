@@ -1,33 +1,113 @@
-# 谜溯：银哨之后 · Phase 1.5
+# 谜溯：银哨之后
 
-Phase 1 是从零搭建的浏览器垂直切片，使用 TypeScript、Phaser 3、HTML/CSS、Vite、Vitest 与 Playwright。Phaser 处理像素世界、角色移动、碰撞、摄像机和交互位置；HTML/CSS 处理对话、案件笔记、推理面板及触控控制。
+《谜溯：银哨之后》是一款以福尔摩斯与华生为主角的浏览器叙事推理游戏原型。玩家从贝克街 221B 接受委托，前往庄园调查莉迪亚旧房中的线索，并在案件笔记与推理板中整理证据和假设。
 
-## 开发
+当前仓库包含一段可玩的案件开场与调查切片，重点在叙事交互、房间探索、证据记录，以及莉迪亚卧室的 2.5D 世界空间和家具碰撞验证。它还不是完整案件或正式发行版本。
+
+## 开始运行
+
+需要 Node.js 20.19+ 或 22.12+（与 Vite 7 的运行要求一致）。
 
 ```sh
 npm install
 npm run dev
 ```
 
-桌面使用 WASD/方向键移动、E 调查、J 打开案件笔记、K 打开推理板。移动端使用虚拟摇杆与调查按钮。走廊与莉迪亚旧房共用同一世界单位和地图网格。
+Vite 会在终端显示本地开发地址，通常是 `http://localhost:5173`。开发服务器监听 `0.0.0.0`，可供同一网络中的移动设备访问。
 
-## 美术资源
-
-正式 PNG 集中在 `public/assets/art/`，路径与资源类别登记在 [`src/data/art/assetManifest.ts`](src/data/art/assetManifest.ts)。世界基线保持 Tile 16×16、角色视觉尺寸 16×24、脚部碰撞 10×8；Phaser 使用 `pixelArt` / `roundPixels`，CSS Canvas 使用 `image-rendering: pixelated`。
-
-当前已接入维多利亚木地板与墙面图块、莉迪亚房间家具道具、假铃绳、庄园走廊装饰、221B 家具与雨夜窗户、Holmes / Watson 角色表、人物头像图集、E06/E08/E09 证据图集和雨夜标题背景。未提供的美术只保留基础 fallback，并登记在 [`ART_ASSET_REQUESTS.md`](ART_ASSET_REQUESTS.md)。
-
-## 验证
+生产构建与本地预览：
 
 ```sh
-npm test
-npx playwright install chromium
-npm run test:browser
 npm run build
+npm run preview
 ```
 
-单元测试覆盖 GameState、重复证据、假设状态、证据关系和存档往返；浏览器冒烟测试覆盖桌面调查路径、Continue 恢复、移动端横屏/竖屏操作、案件笔记和重置存档。
+## 开始游戏
 
-## 当前切片边界
+在标题页选择“开始调查”。开场包含 9 句对白，之后玩家留在 221B，可以自由移动、与华生交谈并调查少量环境对象。和华生交谈后，东南出口会允许玩家前往庄园。
 
-已实现 221B 开场、庄园走廊、莉迪亚旧房以及 E06/E08/E09 数据。E01/E02 只由开场剧情发放。Phase 1.5 不扩展案件玩法：环境艺术仍需补齐可复用的完整房间图块与庄园走廊装饰，当前请求见 `ART_ASSET_REQUESTS.md`。E06/E08/E09 的视觉资源按现有证据 ID 与逻辑对应。
+庄园走廊连接 221B 与莉迪亚旧房。进入卧室后可调查 E06「房门与窗锁」、E08「通气孔与细密铁网」和 E09「床头假铃绳」。证据可在案件笔记中查看，并用于案件推理板上的假设整理。存档支持继续案件。
+
+## 操作
+
+| 操作 | 键盘 / 鼠标 | 移动设备 |
+|---|---|---|
+| 移动 | WASD 或方向键 | 虚拟摇杆 |
+| 交谈、调查、使用出口 | E | 屏幕上的交互按钮 |
+| 打开案件笔记 | J | HUD 上的“案件笔记” |
+| 打开推理板 | K | HUD 上的“推理板” |
+| 关闭当前界面 | Esc | 点击界面内的关闭控件或返回操作 |
+| 开关附近的门 | O | 可用时出现门控件 |
+
+调试快捷键：
+
+- **F3**：开启或关闭当前房间的调试覆盖层。
+- **F4**：切换 Lydia Bedroom 的投影网格。
+- **F5**：切换 Lydia Bedroom 的碰撞 footprint。
+- **F6**：切换 Lydia Bedroom 的交互范围。
+- **F7**：切换 Lydia Bedroom 的 3D 世界示意图与体积信息。
+- **F8**：切换 Lydia Bedroom 家具的相机投影轴检查。
+
+F4–F8 的专用视图面向 Lydia Bedroom 的开发验收；F3 在其他房间显示各自的物理调试信息。
+
+## 当前内容与空间系统
+
+- **221B Baker Street**：完整房间美术、家具碰撞与遮挡、室内灯光、Holmes 和 Watson 世界角色、短对话、环境观察及出发流程。
+- **Manor Corridor**：庄园走廊场景、门与房间转换、走廊碰撞和视觉调试。
+- **Lydia Bedroom**：独立房间建筑底图与家具素材；家具以场景实体数据表达位置、尺寸、地面 footprint、占用体积、使用锚点和遮挡关系。房间使用自己的 `WorldProjection`，角色位置和 E06/E08/E09 交互距离以 world X/Z 为依据。
+- **证据与推理**：保留 E01、E02、E06、E08、E09 的数据、证据关系、假设和存档状态。
+- **输入适配**：桌面键盘与移动端虚拟摇杆、交互按钮共用游戏状态和场景逻辑。
+
+Lydia Bedroom 的 2.5D scene graph 是本仓库的空间验证实现，不代表 221B 或 Manor Corridor 已迁移到同一 world-space 模型。其他房间继续使用共享 Phaser 场景和各自的物理房间配置。
+
+## 项目结构
+
+```text
+src/
+  core/                 游戏状态、ID、类型与存档
+  data/cases/           银哨之后的对白、场景、证据与交互数据
+  data/art/             美术资源清单
+  game/scenes/          Phaser 世界场景与运行逻辑
+  game/rooms/           房间物理配置
+  game/world/           Lydia Bedroom 投影、世界房间与 3D scene graph
+  systems/              对话、环境交互与推理系统
+public/assets/art/      游戏内美术资源
+tests/unit/             Vitest 单元测试
+tests/browser/          Playwright 浏览器测试
+screenshots/            各阶段开发验收截图
+```
+
+## 开发与验证
+
+```sh
+npm test                 # 单元测试
+npm run build            # TypeScript 检查与生产构建
+npx playwright install chromium
+npm run test:browser     # 浏览器回归测试
+```
+
+常用浏览器测试可单独运行：
+
+```sh
+npx playwright test tests/browser/narrative-opening.spec.ts
+npx playwright test tests/browser/physical-room-system.spec.ts
+npx playwright test tests/browser/lydia-scene-graph.spec.ts
+npx playwright test tests/browser/lydia-investigation.spec.ts
+```
+
+浏览器测试覆盖开场与移动端操作、走廊和房间导航、卧室空间投影与家具体积、物理稳定性、证据调查及相机锁定美术检查。完整套件需要安装 Playwright Chromium。
+
+## 设计与实现文档
+
+- [场景物理化系统](SCENE_PHYSICALIZATION_SYSTEM.md)：共享房间配置和物理场景约定。
+- [场景物理化测试路线](SCENE_PHYSICALIZATION_TESTS.md)：手动验证步骤与回归检查。
+- [视觉规范](VISUAL_BIBLE.md)：像素美术、视角、比例与光照基准。
+- [美术资源需求](ART_ASSET_REQUESTS.md)：资源清单与尚待处理的美术需求。
+- [221B 美术重建计划](221B_ART_RECONSTRUCTION_PLAN.md) 与 [221B 构图计划](221B_COMPOSITION_PLAN.md)：221B 空间与美术决策记录。
+- [庄园走廊重建计划](MANOR_CORRIDOR_RECONSTRUCTION_PLAN.md)：走廊布局、建筑和美术规划。
+- [Lydia 相机锁定资产审查](LYDIA_CAMERA_LOCKED_ASSET_AUDIT.md)：Bedroom 投影基准与家具资产检查。
+- [叙事运行时审计](NARRATIVE_RUNTIME_AUDIT.md)：叙事功能的历史审计记录；若与当前实现不一致，应以源码和浏览器行为为准。
+
+## 技术栈
+
+TypeScript、Phaser 3、Vite、HTML/CSS、Vitest 和 Playwright。Phaser 负责游戏场景、角色、输入与物理呈现；HTML/CSS 负责标题、对白、案件笔记、推理板及移动端界面。
