@@ -1,0 +1,16 @@
+import { describe,expect,it } from 'vitest';
+import { RoomWorld3D } from '../../src/game/world/roomWorld3D';
+import { PHYSICAL_ROOMS,isRoomGroundBlocked } from '../../src/game/rooms/physicalRooms';
+import { isolateCharacterFrames } from '../../src/game/world/characterAtlas';
+import { DEDUCTIONS,resolveDeduction,investigationObjective } from '../../src/core/state/investigation';
+import { initialGameState } from '../../src/core/state/gameState';
+describe('world migration',()=>{
+ it('3D volumes retain floor contact for every calibrated room',()=>{
+  for(const id of ['221b','hall'] as const){const world=new RoomWorld3D(PHYSICAL_ROOMS[id]);for(let x=10;x<world.room.width;x+=13)for(let y=10;y<320;y+=11){const p=world.fromScreen(x,y);expect(!!world.collision(p,new Set()),`${id} ${x},${y} ${world.collision(p,new Set())}`).toBe(isRoomGroundBlocked(world.room,x,y));expect(world.projection.project(p).x).toBeCloseTo(x,8);expect(world.projection.project(p).y).toBeCloseTo(y,8);}}
+ });
+ it('places rugs from canonical ground entities, below actors, rather than duplicated screen coordinates',()=>{for(const [room,id,x,y] of [['221b','central-rug',137.5,176],['hall','lydia-threshold-rug',210,161.5]] as const){const w=new RoomWorld3D(PHYSICAL_ROOMS[room]);const placement=w.visualPlacement(id,{x:-1,y:-1,depth:999});expect(placement.x).toBeCloseTo(x);expect(placement.y).toBeCloseTo(y);expect(placement.depth).toBe(-17);expect(w.entities.find(e=>e.id===id)?.blocksMovement).toBe(false);}});
+ it('grounds saved actors before accepting their location so elevation cannot bypass a wall',()=>{const w=new RoomWorld3D(PHYSICAL_ROOMS['221b']);expect(w.groundedPosition({x:263/40,y:99,z:45/40})).toBeUndefined();expect(w.groundedPosition({x:263/40,y:99,z:185.8/40})).toEqual({x:263/40,y:0,z:185.8/40});});
+ it('standing height and closed doors participate in collisions',()=>{const w=new RoomWorld3D(PHYSICAL_ROOMS['221b']);const p=w.fromScreen(449,310);expect(w.collision(p,new Set())).toBeUndefined();expect(w.collision(p,new Set(['221b-entry']))).toBe('221b-entry');expect(w.collision({...p,y:0,x:NaN},new Set())).toBe('room-boundary');});
+ it('atlas extraction discards isolated marks and preserves whole connected figures',()=>{const data=new Uint8ClampedArray(100*100*4);for(let y=20;y<70;y++)for(let x=20;x<70;x++)data[(y*100+x)*4+3]=255;data[4*101+3]=255;const figures=isolateCharacterFrames(data,100,100);expect(figures).toHaveLength(1);expect(figures[0].y).toBe(20);expect(figures[0].indices).toHaveLength(2500);});
+ it('deductions require discovered evidence, reject unsupported explanations, and preserve progress',()=>{let state=initialGameState();expect(resolveDeduction(state,'staged-rope',1)).toBe(state);state={...state,discoveredEvidence:['E01','E02','E06','E08','E09'],storyFlags:{openingComplete:true,watsonSpoken:true}};for(const d of DEDUCTIONS){const wrong=resolveDeduction(state,d.id,1-d.answer);expect(wrong.hypothesisState[`deduction:${d.id}`]).toBe(false);expect(wrong.hypothesisState[`deduction-choice:${d.id}`]).toBe(1-d.answer);state=resolveDeduction(state,d.id,d.answer);}expect(investigationObjective(state)).toContain('初步复盘完成');expect(Object.keys(state.hypothesisState)).toHaveLength(6);});
+});

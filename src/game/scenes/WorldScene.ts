@@ -1,3 +1,5 @@
+import { RoomWorld3D } from '../world/roomWorld3D';
+import { isolateCharacterFrames } from '../world/characterAtlas';
 import Phaser from 'phaser';
 import type { SceneId } from '../../core/types';
 import type { Point } from '../../core/types';
@@ -6,7 +8,7 @@ import { SCENES_DATA } from '../../data/cases/silver-whistle/scenes';
 import { ART_ASSETS, WORLD_SCALE } from '../../data/art/assetManifest';
 import { INTERACTABLES } from '../../data/cases/silver-whistle/interactables';
 import { WATSON_ACTOR } from '../../data/cases/silver-whistle/roomNarrative';
-import { PHYSICAL_ROOMS, roomSurfaceAt, isRoomGroundBlocked, resolveRoomSpawn, type PhysicalRoomDefinition, type RoomSurface, type DoorDefinition } from '../rooms/physicalRooms';
+import { PHYSICAL_ROOMS, roomSurfaceAt, resolveRoomSpawn, type PhysicalRoomDefinition, type RoomSurface, type DoorDefinition } from '../rooms/physicalRooms';
 import { LYDIA_CLOSED_DOOR, LYDIA_DOOR_WORLD, LYDIA_ENTRY_WORLD, LYDIA_EXIT_WORLD, LYDIA_FURNITURE_GROUPS, LYDIA_GROUND_FOOTPRINTS, LYDIA_PLAYER_COLLISION_VOLUME, LYDIA_PLAYER_FOOTPRINT, LYDIA_PROJECTION, LYDIA_ROOM_ARCHITECTURE, LYDIA_RUG_FOOTPRINT, LYDIA_SCENE_CAMERA, LYDIA_SCENE_GRAPH, LYDIA_WORLD_ENTITIES, LYDIA_WALL_MOUNTED, LYDIA_WORLD_ROOM, LYDIA_WORLD_INTERACTABLES, findLydiaCollision, isWithinGroundFootprint, lydiaDistanceXZ, resolveLydiaSpawn, type GroundFootprint, type LydiaCollisionHit } from '../world/lydiaWorldRoom';
 import type { WorldPosition3D } from '../world/WorldProjection';
 import { entityDepthKey, entityOcclusionRelation, entityVolume } from '../world/sceneGraph3D';
@@ -24,7 +26,7 @@ export class WorldScene extends Phaser.Scene {
   private pendingActions = new Set<string>();
   private actorFeetOffset = 0;
   private heroDisplayHeight = 51.6;
-  private facing: 'south'|'north'|'east' = 'south';
+  private facing: 'south'|'north'|'east'|'west' = 'south';
   private uiBlocked = false;
   private holmesContactOuter?: Phaser.GameObjects.Ellipse;
   private holmesContactInner?: Phaser.GameObjects.Ellipse;
@@ -50,6 +52,8 @@ export class WorldScene extends Phaser.Scene {
   private playerWorldPosition?:WorldPosition3D;
   private lastLydiaMovementBlock?:LydiaCollisionHit;
   private physicalRoom?:PhysicalRoomDefinition;
+  private calibratedWorld?:RoomWorld3D;
+  private calibratedPosition?:WorldPosition3D;
   private roomBuildGeneration=0;
   private doorColliders=new Map<string,Phaser.GameObjects.Rectangle>();
   private doorLeaves=new Map<string,Phaser.GameObjects.Image>();
@@ -137,6 +141,7 @@ export class WorldScene extends Phaser.Scene {
     this.watsonActor=undefined;this.watsonContactShadow=undefined;this.watsonCastShadow=undefined;
     this.debugGraphics=undefined; this.debugLabel=undefined;this.lydiaSchematicGraphics=undefined;this.lydiaSchematicLabel=undefined;this.lydiaSchematicVisible=false;this.lydiaPerspectiveGraphics=undefined;this.lydiaPerspectiveLabel=undefined;this.lydiaPerspectiveVisible=false;this.lydiaPerspectiveNames.clear();
     this.lydiaEntitySprites.clear();this.lydiaWallSprites.clear();this.debugNames.clear();this.currentSurface=undefined;
+    this.calibratedPosition=undefined;this.calibratedWorld=id===SCENES.LYDIA_ROOM?undefined:new RoomWorld3D(PHYSICAL_ROOMS[id]);
     this.physicalRoom=PHYSICAL_ROOMS[id];this.doorColliders.clear();this.doorLeaves.clear();this.doorStates.clear();this.doorAnimating.clear();
     const metadata=SCENES_DATA[id];
     this.worldBounds = {width:metadata.width,height:metadata.height};
@@ -151,7 +156,7 @@ export class WorldScene extends Phaser.Scene {
     this.ensureHolmesFrames();
     const heroReady=this.textures.exists('holmes-sheet');
     const usePhase16=(id===SCENES.LYDIA_ROOM||id===SCENES.BAKER_STREET||id===SCENES.HALL)&&this.textures.exists('holmes-phase16');
-    const texture=usePhase16?'holmes-phase16':heroReady?'holmes-sheet':'__DEFAULT';
+    const texture=usePhase16?'holmes-phase16-clean':heroReady?'holmes-sheet':'__DEFAULT';
     const frame=usePhase16?'holmes16-south-idle':heroReady?'holmes-south-0':undefined;
     // Keep Holmes at one uniform world height across the narrative rooms, including Lydia Bedroom.
     const heroHeight=(id===SCENES.LYDIA_ROOM||id===SCENES.BAKER_STREET||id===SCENES.HALL)?51.6:WORLD_SCALE.character.height;
@@ -169,6 +174,7 @@ export class WorldScene extends Phaser.Scene {
     else this.player.setDisplaySize(WORLD_SCALE.character.width,WORLD_SCALE.character.height);
     if(!heroReady)this.player.setTint(0xb9aa8c);
     this.actorFeetOffset=id===SCENES.LYDIA_ROOM?0:usePhase16?heroHeight/2:0;
+    if(this.calibratedWorld){this.calibratedPosition=this.calibratedWorld.fromScreen(this.player.x,this.player.y+this.actorFeetOffset);const savedWorld=worldPosition&&this.calibratedWorld.groundedPosition(worldPosition);if(savedWorld){this.calibratedPosition=savedWorld;const point=this.calibratedWorld.projection.project(this.calibratedPosition);this.player.setPosition(point.x,point.y-this.actorFeetOffset);}}
     // The locked transition renders before movement resumes: initialize its final scale/depth now.
     if(initialWorldPosition)this.player.setScale(heroHeight/this.player.frame.height*LYDIA_PROJECTION.scaleAt(initialWorldPosition.z));
     this.player.setDepth(initialWorldPosition?entityDepthKey(initialWorldPosition,LYDIA_PROJECTION):this.player.y+this.actorFeetOffset);
@@ -221,7 +227,7 @@ export class WorldScene extends Phaser.Scene {
       const sceneGraphAudit=id===SCENES.LYDIA_ROOM?this.getLydiaSceneGraphAudit():undefined;
       if(sceneGraphAudit)window.dispatchEvent(new CustomEvent('misu:scene-graph-debug',{detail:sceneGraphAudit}));
       window.dispatchEvent(new CustomEvent('misu:scene-ready',{detail:{
-        scene:id,position:{x:this.player.x,y:this.player.y},worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,
+        scene:id,position:{x:this.player.x,y:this.player.y},worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:this.calibratedPosition?{...this.calibratedPosition}:undefined,
         worldBounds:{...this.worldBounds},walkableBounds:this.physicalRoom?.walkableBounds,cameraZoom:this.cameras.main.zoom,
         worldRoom:id===SCENES.LYDIA_ROOM?{camera:LYDIA_SCENE_CAMERA,size:{...LYDIA_WORLD_ROOM.size},floorPlane:LYDIA_WORLD_ROOM.floorPlane,floorQuad:LYDIA_PROJECTION.floor,controlPoints:{NW:{world:{x:0,z:0},screen:LYDIA_PROJECTION.floor.northwest},NE:{world:{x:LYDIA_PROJECTION.size.width,z:0},screen:LYDIA_PROJECTION.floor.northeast},SW:{world:{x:0,z:LYDIA_PROJECTION.size.depth},screen:LYDIA_PROJECTION.floor.southwest},SE:{world:{x:LYDIA_PROJECTION.size.width,z:LYDIA_PROJECTION.size.depth},screen:LYDIA_PROJECTION.floor.southeast}},roomScale:this.playerWorldPosition?LYDIA_PROJECTION.scaleAt(this.playerWorldPosition.z):undefined,playerProjection:this.playerWorldPosition?LYDIA_PROJECTION.project(this.playerWorldPosition):undefined,playerFootAnchor:this.playerWorldPosition?{x:this.player.x,y:this.player.y}:undefined}:undefined,
         doorStates:Object.fromEntries(this.doorStates),
@@ -294,7 +300,7 @@ export class WorldScene extends Phaser.Scene {
     // Never close the leaf through a standing actor.
     if(closing && (this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition
       ? !!findLydiaCollision(this.playerWorldPosition,true)
-      : isRoomGroundBlocked(this.physicalRoom!,this.player.x,this.getPlayerFeetY(),new Set([door.id]))))return;
+      : !!this.calibratedWorld?.collision(this.calibratedPosition!,new Set([door.id]))))return;
     this.doorStates.set(door.id,closing?'closing':'opening');this.doorAnimating.add(door.id);
     (collider.body as Phaser.Physics.Arcade.StaticBody).enable=closing;
     window.dispatchEvent(new CustomEvent('misu:door-state',{detail:{scene:this.current,doorId:door.id,state:closing?'closing':'opening'}}));
@@ -320,7 +326,8 @@ export class WorldScene extends Phaser.Scene {
       prop('hall-sconce-b',515,38,28,33,38);
       prop('hall-portrait-a',145,52,23,30,53);prop('hall-portrait-b',354,48,23,30,50);prop('hall-portrait-c',629,58,25,30,62);
       if(this.textures.exists(ART_ASSETS.manorCorridorLydiaThreshold.key)){
-        this.add.image(210,161.5,ART_ASSETS.manorCorridorLydiaThreshold.key).setDisplaySize(54,21).setDepth(161.5).setName('hall:lydia-threshold-rug');
+        const rug=this.calibratedWorld?.entities.find(entity=>entity.id==='lydia-threshold-rug');
+        if(rug){const floor=this.calibratedWorld!.projection.project(rug.position);this.add.image(floor.x,floor.y,ART_ASSETS.manorCorridorLydiaThreshold.key).setDisplaySize(rug.visual.displayWidth,rug.visual.displayHeight).setDepth(-17).setName('hall:lydia-threshold-rug');}
       }
       prop('hall-console',650,130,74,34,148);
       prop('hall-vase',637,103,16,22,116);
@@ -342,7 +349,8 @@ export class WorldScene extends Phaser.Scene {
         if(!this.textures.exists(key))continue;
         const texture=this.textures.get(key);
         if(!texture.has(frame))texture.add(frame,0,visual.source.x,visual.source.y,visual.source.width,visual.source.height);
-        this.add.image(visual.display.x,visual.display.y,key,frame).setDisplaySize(visual.display.width,visual.display.height).setFlipX(visual.flipX??false).setDepth(visual.depthY).setName(`prop:${visual.id}`);
+        const placement=this.calibratedWorld?.visualPlacement(visual.id==='rug'?'central-rug':visual.id,{x:visual.display.x,y:visual.display.y,depth:visual.depthY})??{x:visual.display.x,y:visual.display.y,depth:visual.depthY};
+        this.add.image(placement.x,placement.y,key,frame).setDisplaySize(visual.display.width,visual.display.height).setFlipX(visual.flipX??false).setDepth(placement.depth).setName(`prop:${visual.id}`);
       }
       return;
     }
@@ -454,24 +462,33 @@ export class WorldScene extends Phaser.Scene {
     if(!this.anims.exists('holmes-walk-east')) this.anims.create({key:'holmes-walk-east',frames:[0,1,2,1].map(i=>({key:'holmes-sheet',frame:`holmes-east-${i}`})),frameRate:7,repeat:-1});
   }
   private ensurePhase16HolmesFrames(){
-    if(!this.textures.exists('holmes-phase16')) return;
-    const texture=this.textures.get('holmes-phase16');
-    // Tight crops from the generated 4x4 sheet. Rows are idle, then three walk frames.
-    const crops=[
-      [[110,39,162,276],[83,40,166,275],[90,40,132,275],[56,39,125,276]],
-      [[106,0,166,315],[81,0,166,315],[63,0,162,315],[42,0,166,315]],
-      [[104,0,166,316],[82,0,162,316],[59,0,178,316],[37,0,175,316]],
-      [[108,0,164,264],[78,0,165,267],[59,0,179,264],[49,0,175,261]],
-    ];
-    crops.forEach((row,r)=>row.forEach((b,c)=>{
-      const x=Math.round(c*1247/4)+b[0],y=Math.round(r*1261/4)+b[1];
-      const name=`holmes16-${['north','south','west','east'][c]}-${r===0?'idle':`walk-${r-1}`}`;
-      if(!texture.has(name))texture.add(name,0,x,y,b[2],b[3]);
-    }));
+    if(!this.textures.exists('holmes-phase16'))return;
+    const cleanKey='holmes-phase16-clean';
+    if(!this.textures.exists(cleanKey)){
+      const source=this.textures.get('holmes-phase16').getSourceImage() as HTMLImageElement;
+      const input=document.createElement('canvas');input.width=source.width;input.height=source.height;
+      const context=input.getContext('2d',{willReadFrequently:true});if(!context)return;
+      context.drawImage(source,0,0);const data=context.getImageData(0,0,input.width,input.height);
+      const figures=isolateCharacterFrames(data.data,input.width,input.height);
+      if(figures.length!==16)throw new Error(`Character atlas: expected 16 figures, found ${figures.length}`);
+      const canvas=document.createElement('canvas');canvas.width=4*240;canvas.height=4*330;
+      const output=canvas.getContext('2d')!;
+      figures.forEach((figure,i)=>{
+        const width=figure.right-figure.x+1,height=figure.bottom-figure.y+1;
+        const isolated=document.createElement('canvas');isolated.width=width;isolated.height=height;
+        const frameContext=isolated.getContext('2d')!,frame=frameContext.createImageData(width,height);
+        for(const index of figure.indices){const x=index%input.width-figure.x,y=Math.floor(index/input.width)-figure.y;frame.data.set(data.data.subarray(index*4,index*4+4),(y*width+x)*4);}
+        frameContext.putImageData(frame,0,0);
+        const displayWidth=width*326/height;
+        output.drawImage(isolated,(i%4)*240+(240-displayWidth)/2,Math.floor(i/4)*330+2,displayWidth,326);
+      });
+      const texture=this.textures.addCanvas(cleanKey,canvas)!;
+      figures.forEach((_,i)=>texture.add(`holmes16-${['north','south','west','east'][i%4]}-${i<4?'idle':`walk-${Math.floor(i/4)-1}`}`,0,(i%4)*240,Math.floor(i/4)*330,240,330));
+    }
     for(const direction of ['north','south','east','west']){
-      const frames=[0,1,2].map(i=>({key:'holmes-phase16',frame:`holmes16-${direction}-walk-${i}`}));
+      const frames=[0,2,1,2].map(i=>({key:cleanKey,frame:`holmes16-${direction}-walk-${i}`}));
       const key=`holmes16-walk-${direction}`;
-      if(!this.anims.exists(key))this.anims.create({key,frames,frameRate:7,repeat:-1});
+      if(!this.anims.exists(key))this.anims.create({key,frames,frameRate:12,repeat:-1});
     }
   }
   private ensureWatsonFrames(){
@@ -602,10 +619,11 @@ export class WorldScene extends Phaser.Scene {
     this.footstepDistance+=Math.hypot(this.player.x-oldX,this.player.y-oldY);
     if(this.footstepDistance>=24){this.footstepDistance=0;window.dispatchEvent(new CustomEvent('misu:footstep',{detail:{surface:this.currentSurface??'WOOD'}}));}
     if(magnitude>0){
-      this.facing=Math.abs(x)>Math.abs(y)?'east':y<0?'north':'south';
-      this.player.setFlipX(this.facing==='east'&&x<0);
+      this.facing=Math.abs(x)>Math.abs(y)?x<0?'west':'east':y<0?'north':'south';
+      this.player.setFlipX(false);
       const phase16=(this.current===SCENES.LYDIA_ROOM||this.current===SCENES.BAKER_STREET||this.current===SCENES.HALL)&&this.textures.exists('holmes-phase16');
-      const animation=`${phase16?'holmes16':'holmes'}-walk-${this.facing}`;
+      const animation=`${phase16?'holmes16':'holmes'}-walk-${!phase16&&this.facing==='west'?'east':this.facing}`;
+      if(!phase16)this.player.setFlipX(this.facing==='west');
       if(this.anims.exists(animation)&&!this.player.anims.isPlaying) this.player.play(animation);
       else if(this.anims.exists(animation)&&this.player.anims.currentAnim?.key!==animation) this.player.play(animation);
     } else if(this.player.anims.isPlaying) {
@@ -619,7 +637,7 @@ export class WorldScene extends Phaser.Scene {
       if(this.current!==SCENES.LYDIA_ROOM)this.syncPhase16PlayerFootprint();
     }
     const feetY=this.getPlayerFeetY();
-    this.player.setDepth(this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):feetY);
+    this.player.setDepth(this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):this.calibratedWorld&&this.calibratedPosition?this.calibratedWorld.depthAt(this.calibratedPosition):feetY);
     if(this.current===SCENES.LYDIA_ROOM){this.syncLydiaEntityDepths();if(this.lydiaSchematicVisible)this.drawLydia3DSchematic();}
     this.updateHolmesLighting();
     this.updateRoomFeedback();
@@ -628,7 +646,7 @@ export class WorldScene extends Phaser.Scene {
     this.positionClock+=delta;
     this.lightingClock+=delta;
     if(this.physicalRoom&&this.lightingClock>=150){this.lightingClock=0;const influences=this.physicalRoom.lights.reduce((acc,light)=>{const d=Math.hypot(this.player.x-light.x,this.player.y-light.y),t=Math.max(0,1-d/light.radius),value=t*t*light.intensity;acc[light.kind]+=value;return acc;},{warm:0,cool:0});window.dispatchEvent(new CustomEvent('misu:light-response',{detail:{scene:this.current,warm:influences.warm,cool:influences.cool,tint:this.player.tintTopLeft}}));}
-    if(this.positionClock>=100){this.positionClock=0;const projectionScreen=this.playerWorldPosition?LYDIA_PROJECTION.project(this.playerWorldPosition):undefined;const collision=this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?findLydiaCollision(this.playerWorldPosition,this.doorStates.get('bedroom-entry')!=='open'):undefined;window.dispatchEvent(new CustomEvent('misu:player-position',{detail:{scene:this.current,x:this.player.x,y:this.player.y,feetY:this.getPlayerFeetY(),footAnchorScreen:this.current===SCENES.LYDIA_ROOM?{x:this.player.x,y:this.player.y}:undefined,projectionScreen:this.current===SCENES.LYDIA_ROOM?projectionScreen:undefined,worldDepthKey:this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):undefined,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,worldGroundFootprint:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_FOOTPRINT}:undefined,characterCollisionVolume:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_COLLISION_VOLUME}:undefined,collisionAtPosition:collision,lastMovementBlock:this.current===SCENES.LYDIA_ROOM?this.lastLydiaMovementBlock:undefined,inputLocked:this.uiBlocked,displayScale:{x:this.player.scaleX,y:this.player.scaleY},doorOpen:this.doorStates.get(this.current===SCENES.BAKER_STREET?'221b-entry':'bedroom-entry')==='open',body:{x:body.x,y:body.y,width:body.width,height:body.height}}}));
+    if(this.positionClock>=100){this.positionClock=0;const projectionScreen=this.playerWorldPosition?LYDIA_PROJECTION.project(this.playerWorldPosition):undefined;const collision=this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?findLydiaCollision(this.playerWorldPosition,this.doorStates.get('bedroom-entry')!=='open'):undefined;window.dispatchEvent(new CustomEvent('misu:player-position',{detail:{scene:this.current,x:this.player.x,y:this.player.y,feetY:this.getPlayerFeetY(),footAnchorScreen:this.current===SCENES.LYDIA_ROOM?{x:this.player.x,y:this.player.y}:undefined,projectionScreen:this.current===SCENES.LYDIA_ROOM?projectionScreen:undefined,worldDepthKey:this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):undefined,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:this.calibratedPosition?{...this.calibratedPosition}:undefined,worldGroundFootprint:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_FOOTPRINT}:undefined,characterCollisionVolume:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_COLLISION_VOLUME}:undefined,collisionAtPosition:collision??(this.calibratedWorld&&this.calibratedPosition?this.calibratedWorld.collision(this.calibratedPosition,new Set([...this.doorStates].filter(([,state])=>state!=='open').map(([id])=>id))):undefined),roomWorld3D:this.calibratedWorld?{size:this.calibratedWorld.projection.size,characterVolume:this.calibratedWorld.character,volumes:this.calibratedWorld.volumes,entities:this.calibratedWorld.entities}:undefined,lastMovementBlock:this.current===SCENES.LYDIA_ROOM?this.lastLydiaMovementBlock:undefined,inputLocked:this.uiBlocked,displayScale:{x:this.player.scaleX,y:this.player.scaleY},doorOpen:this.doorStates.get(this.current===SCENES.BAKER_STREET?'221b-entry':'bedroom-entry')==='open',body:{x:body.x,y:body.y,width:body.width,height:body.height}}}));
       const nearest=this.physicalRoom?.doors.map(d=>({door:d,distance:this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition
         ?lydiaDistanceXZ(this.playerWorldPosition,LYDIA_DOOR_WORLD)
         :Math.hypot(this.player.x-d.x,this.getPlayerFeetY()-d.y)})).filter(v=>v.distance<=(this.current===SCENES.LYDIA_ROOM?v.door.interactionRange/42:v.door.interactionRange)).sort((a,b)=>a.distance-b.distance)[0];
@@ -654,18 +672,15 @@ export class WorldScene extends Phaser.Scene {
     body.setVelocity(0,0);body.updateFromGameObject();
   }
   private movePlanarRoom(inputX:number,inputY:number,delta:number){
-    const room=this.physicalRoom;if(!room)return;
+    const world=this.calibratedWorld,current=this.calibratedPosition;if(!world||!current)return;
     const closed=new Set([...this.doorStates].filter(([,state])=>state==='closed'||state==='closing').map(([id])=>id));
-    const blocked=(x:number,y:number)=>{
-      if(isRoomGroundBlocked(room,x,y+this.actorFeetOffset,closed))return true;
-      return !!this.watsonActor&&Math.abs(x-WATSON_ACTOR.x)<14&&Math.abs(y+this.actorFeetOffset-WATSON_ACTOR.feetY)<9;
-    };
-    // Bounded substeps prevent tunnelling after a slow frame or a tab resume.
-    const distance=92*Math.min(delta,150)/1000,steps=Math.max(1,Math.ceil(distance/2));
+    const blocked=(p:WorldPosition3D)=>world.collision(p,closed)||!!this.watsonActor&&Math.abs(p.x-WATSON_ACTOR.x/40)<.35&&Math.abs(p.z-WATSON_ACTOR.feetY/40)<.225;
+    const distance=2.3*Math.min(delta,150)/1000,steps=Math.max(1,Math.ceil(distance/.05));
     for(let i=0;i<steps;i++){
-      const x=this.player.x+inputX*distance/steps;if(!blocked(x,this.player.y))this.player.x=x;
-      const y=this.player.y+inputY*distance/steps;if(!blocked(this.player.x,y))this.player.y=y;
+      const x={...current,x:current.x+inputX*distance/steps};if(!blocked(x))current.x=x.x;
+      const z={...current,z:current.z+inputY*distance/steps};if(!blocked(z))current.z=z.z;
     }
+    current.y=0;const screen=world.projection.project(current);this.player.setPosition(screen.x,screen.y-this.actorFeetOffset);
     const body=this.player.body as Phaser.Physics.Arcade.Body;body.setVelocity(0,0);body.updateFromGameObject();
   }
   private getPlayerFeetY(){return this.player.y+this.actorFeetOffset}
@@ -677,7 +692,7 @@ export class WorldScene extends Phaser.Scene {
       :roomSurfaceAt(this.physicalRoom,this.player.x,feetY);
     if(surface!==this.currentSurface){
       this.currentSurface=surface;
-      window.dispatchEvent(new CustomEvent('misu:surface',{detail:{surface,x:this.player.x,y:feetY,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined}}));
+      window.dispatchEvent(new CustomEvent('misu:surface',{detail:{surface,x:this.player.x,y:feetY,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:this.calibratedPosition?{...this.calibratedPosition}:undefined}}));
     }
     if(this.debugGraphics?.visible)this.drawPhysicsDebug(feetY);
   }
@@ -903,11 +918,11 @@ export class WorldScene extends Phaser.Scene {
   }
   private setHolmesIdleFrame(){
     if((this.current===SCENES.LYDIA_ROOM||this.current===SCENES.BAKER_STREET||this.current===SCENES.HALL)&&this.textures.exists('holmes-phase16')){
-      this.player.setTexture('holmes-phase16',`holmes16-${this.facing}-idle`);
+      this.player.setTexture('holmes-phase16-clean',`holmes16-${this.facing}-idle`);
       this.player.setScale(this.heroDisplayHeight/this.player.frame.height*(this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?LYDIA_PROJECTION.scaleAt(this.playerWorldPosition.z):1));
       if(this.player.body&&this.current!==SCENES.LYDIA_ROOM)this.syncPhase16PlayerFootprint();
     }
-    else if(this.textures.exists('holmes-sheet'))this.player.setTexture('holmes-sheet',`holmes-${this.facing}-0`);
+    else if(this.textures.exists('holmes-sheet'))this.player.setTexture('holmes-sheet',`holmes-${this.facing==='west'?'east':this.facing}-0`);
   }
   private syncPhase16PlayerFootprint(){
     const body=this.player.body as Phaser.Physics.Arcade.Body;
@@ -917,5 +932,5 @@ export class WorldScene extends Phaser.Scene {
     body.updateBounds();
     body.setOffset(this.player.frame.width/2-9/sx,this.player.frame.height-10/sy);
   }
-  private interact(){ window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'interact',scene:this.current,x:this.player?.x,y:this.player?.y,feetY:this.getPlayerFeetY(),worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,doorOpen:this.doorStates.get(this.current===SCENES.BAKER_STREET?'221b-entry':'bedroom-entry')==='open'}})); }
+  private interact(){ window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'interact',scene:this.current,x:this.player?.x,y:this.player?.y,feetY:this.getPlayerFeetY(),worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:this.calibratedPosition?{...this.calibratedPosition}:undefined,doorOpen:this.doorStates.get(this.current===SCENES.BAKER_STREET?'221b-entry':'bedroom-entry')==='open'}})); }
 }

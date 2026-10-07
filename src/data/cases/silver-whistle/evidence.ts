@@ -2,6 +2,8 @@ import type { Evidence } from '../../../core/types';
 import { EVIDENCE_IDS, HYPOTHESIS_IDS } from '../../../core/ids';
 
 export const EVIDENCE: Record<string, Evidence> = {
+  [EVIDENCE_IDS.FIXED_BED]:{id:EVIDENCE_IDS.FIXED_BED,name:'固定的床',description:'床脚固定件锈迹一致。床柱旧维修标签注明“地板倾斜，固定防滑”，日期比命案早六年。',source:'莉迪亚旧房 · 床脚',observations:['床的固定早于旧案，不能仅因它古怪就认作犯罪机关。'],tags:['设施年代','旧标签'],relations:[],icon:'床'},
+  [EVIDENCE_IDS.BEDSIDE_SAMPLES]:{id:EVIDENCE_IDS.BEDSIDE_SAMPLES,name:'床头药杯与旧照片',description:'药杯仍有昨夜残液。旧照片拍到莉迪亚发辫上的花斑织带，纹样与假铃绳中的织带一致。',source:'莉迪亚旧房 · 床头柜',observations:['艾琳：那是姐姐的发带。我一直以为已经遗失了。','药杯残液需要和半瓶药、庄园原药作对照。尚未检验，不能据此确认有害成分。','“带子”可能指贴身物品；临终片语不能单独决定凶器或责任人。'],tags:['待检样本','发带','旧照片'],relations:[],icon:'杯'},
   [EVIDENCE_IDS.CASE_TESTIMONY]: { id:EVIDENCE_IDS.CASE_TESTIMONY, name:'委托证言与旧案卷宗', description:'艾琳陈述两年前姐姐莉迪亚在婚礼前离世，并交出警方旧调查卷宗。', source:'贝克街 221B · 艾琳', observations:['旧卷宗附有莉迪亚房间的调查图。'], tags:['委托','旧案'], relations:[], icon:'卷' },
   [EVIDENCE_IDS.HALF_BOTTLE]: { id:EVIDENCE_IDS.HALF_BOTTLE, name:'半瓶睡前药', description:'艾琳昨夜只喝了一半的睡前药。福尔摩斯要求先不要再服用，并带去庄园。', source:'贝克街 221B · 艾琳', observations:['需与庄园原药及房间残液作对照。'], tags:['药物','待检'], relations:[], icon:'瓶' },
   [EVIDENCE_IDS.DOOR_WINDOW_LOCK]: { id:EVIDENCE_IDS.DOOR_WINDOW_LOCK, name:'房门与窗锁', description:'门闩和窗锁只能在室内扣上；窗框无撬痕。旧调查记录确认案发前门窗关闭，莉迪亚发作后自己开门。', source:'莉迪亚旧房 · 门窗', observations:['凶手不一定要在死亡那一刻进入房间。'], tags:['密室','门窗'], relations:[{kind:'supports',targetId:HYPOTHESIS_IDS.PREEXISTING_DANGER,note:'门窗确实从内侧锁闭，但危险可以在锁门前进入。'}], icon:'锁' },

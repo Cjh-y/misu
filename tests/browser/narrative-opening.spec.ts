@@ -20,7 +20,7 @@ async function moveOnStick(page:any,dx:number,dy:number,milliseconds:number,unti
 async function saveAt(page:any,x:number,y:number){
   // Leave the running game first so its pagehide autosave cannot overwrite the fixture.
   await page.goto('/');
-  return page.evaluate(({x,y}:any)=>{const save=JSON.parse(localStorage.getItem('misu.save.v1')??'{}');save.state.playerPosition={x,y};localStorage.setItem('misu.save.v1',JSON.stringify(save));},{x,y});
+  return page.evaluate(({x,y}:any)=>{const save=JSON.parse(localStorage.getItem('misu.save.v1')??'{}');save.state.playerPosition={x,y};delete save.state.playerWorldPosition3D;localStorage.setItem('misu.save.v1',JSON.stringify(save));},{x,y});
 }
 
 test('Title → New Game → 221B playable opening → Watson → investigation → manor → Lydia/E06',async({page})=>{

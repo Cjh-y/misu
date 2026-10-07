@@ -7,7 +7,7 @@ export interface Point { x: number; y: number }
 export interface PlayerHypothesis { id: string; text: string; status: HypothesisStatus; relationTarget?: string; createdAt: number; updatedAt: number }
 export interface GameState {
   currentScene: SceneId; playerPosition: Point; discoveredEvidence: EvidenceId[];
-  /** Lydia Bedroom authoritative save position. playerPosition remains a projection for older scenes/saves. */
+  /** Authoritative floor position in each room. playerPosition is retained for old saves and UI projection. */
   playerWorldPosition3D?: WorldPosition3D;
   investigatedObjects: string[]; dialogueFlags: Record<string, boolean>; storyFlags: Record<string, boolean>;
   dialogueProgress: Record<string, number>;

@@ -55,11 +55,12 @@ test('Lydia ground footprints stop Holmes at the north wall and bed while allowi
 });
 
 test('world footprints block the wardrobe and desk while preserving the floor route beside them',async({page})=>{
-  await page.addInitScript(()=>window.addEventListener('misu:player-position',(event:any)=>((window as any).__livePosition={...event.detail})));
+  await page.addInitScript(()=>window.addEventListener('misu:player-position',(event:any)=>{(window as any).__livePosition={...event.detail};if(event.detail.lastMovementBlock)((window as any).__blocks??=[]).push(event.detail.lastMovementBlock.id);}));
   await continueAt(page,8.0,.45);await move(page,'d',1400);
   expect((await live(page)).worldPosition3D.x).toBeLessThan(8.6);
-  await continueAt(page,8.35,4.8);await move(page,'w',1100);
-  const deskEdge=await live(page);expect(deskEdge.worldPosition3D.z).toBeGreaterThan(4.48);expect(deskEdge.lastMovementBlock?.id).toBe('desk');
+  await continueAt(page,8.35,4.8);await page.keyboard.down('w');
+  await expect.poll(()=>page.evaluate(()=>((window as any).__blocks??[]).includes('desk')),{timeout:10000}).toBe(true);
+  await page.keyboard.up('w');const deskEdge=await live(page);expect(deskEdge.worldPosition3D.z).toBeGreaterThan(4.48);expect(deskEdge.collisionAtPosition).toBeUndefined();
   await continueAt(page,4.2,3.5);await walkUntil(page,'d',p=>p.worldPosition3D?.x>=7.0);
   expect((await live(page)).worldPosition3D.x).toBeGreaterThan(6.8);
 });
@@ -78,15 +79,16 @@ test('world coordinates survive ten room re-entries without camera, scale or for
   await page.setViewportSize({width:1440,height:810});
   await page.addInitScript(()=>{
     (window as any).__roomSamples=[];
+    window.addEventListener('misu:player-position',(event:any)=>(window as any).__livePosition={...event.detail});
     window.addEventListener('misu:scene-ready',(event:any)=>{if(event.detail.scene==='lydia-room')(window as any).__roomSamples.push(event.detail);});
   });
   await continueAt(page,2.0,3.55);
   const initial=await page.evaluate(()=>((window as any).__roomSamples as any[])[0]);
   // The doorway is a scene boundary; each pass uses the same existing Hall transition.
   for(let i=0;i<10;i++){
-    await page.keyboard.down('a');await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});await page.keyboard.up('a');
+    await walkUntil(page,'a',p=>p.scene==='hall');await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});
   await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
-    await page.keyboard.down('d');await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});await page.keyboard.up('d');
+    await walkUntil(page,'d',p=>p.scene==='lydia-room');await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
   await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   }
   const samples=await page.evaluate(()=>((window as any).__roomSamples as any[]));

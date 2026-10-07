@@ -206,3 +206,8 @@ html[data-input="touch"] .nearby{max-width:85%;white-space:normal;text-align:cen
  .dialogue-box p{max-height:25dvh}
 }
 @media(prefers-reduced-motion:reduce){.panel,.location-card{animation:none}.transition-wrap{transition-duration:.1s}}
+
+.case-objective{position:absolute;top:64px;left:16px;max-width:min(380px,75vw);color:#e5d6b2;font-size:12px;line-height:1.6;text-shadow:0 1px 4px #000;pointer-events:none;padding:5px 10px;border-left:2px solid #b59b63;background:linear-gradient(90deg,#181811b8,transparent)}
+[data-blocked="true"] .case-objective{visibility:hidden}
+.case-review,.deduction-board{padding:16px 0;border-top:1px solid #bca67b55}.case-review p{line-height:1.8}.deduction{padding:18px 0;border-bottom:1px solid #bca67b66}.deduction h4{margin:8px 0;font-size:18px}.deduction small{color:#8b7753;line-height:1.7}.deduction button{display:block;width:100%;text-align:left;margin-top:10px;white-space:normal;padding:12px;line-height:1.6}.deduction-solved{color:#496344;line-height:1.8}.case-conclusion{margin:18px 0;padding:16px;border-left:3px solid #897144;line-height:1.8}
+@media(max-width:600px){.case-objective{top:58px;left:10px;font-size:11px;max-width:80vw}}
