@@ -50,7 +50,7 @@ const lydia:PhysicalRoomDefinition={
 
 const baker:PhysicalRoomDefinition={
   scene:SCENES.BAKER_STREET,width:480,height:320,debugLabel:'221B BAKER STREET',interactionRanges:true,defaultSurface:'WOOD',
-  walls:[rect('north-wall',240,8,480,16,16),rect('south-wall-west',214,312,428,16,320),rect('south-wall-east',475,312,10,16,320),rect('west-wall',8,160,16,320,320),rect('east-wall',472,160,16,320,320)],
+  walls:[rect('north-wall',240,56,480,112,112),rect('south-wall-west',214,292,428,56,320),rect('south-wall-east',475,312,10,16,320),rect('west-wall',14,160,28,320,320),rect('east-wall',466,140,28,280,280)],
   props:[
     rect('fireplace',104,104,74,18,113),rect('armchair-left',66,171,42,38,190),rect('armchair-right',178,171,42,38,190),
     rect('desk',122,253,74,30,268),rect('desk-chair',122,284,30,22,295),rect('bookcase',430,126,43,20,136),
@@ -58,26 +58,21 @@ const baker:PhysicalRoomDefinition={
   ],
   surfaces:[{id:'central-rug',surface:'RUG',x:30,y:120,width:215,height:112}],
   lights:[{id:'fireplace-glow',kind:'warm',x:104,y:88,radius:128,intensity:.62},{id:'table-lamp',kind:'warm',x:122,y:174,radius:112,intensity:.68},{id:'rain-window',kind:'cool',x:263,y:58,radius:146,intensity:.2}],
-  // Formal 221B leaf art replaces the temporary shared atlas frame. Geometry and motion stay fixed.
-  doors:[{id:'221b-entry',x:449,y:310,width:42,height:12,depthY:314,interactionRange:50,leafAsset:'bakerDoorLeaf',leaf:{x:428,y:310,width:26,height:48,originX:.1,originY:.92,closedRotation:Math.PI/2,openRotation:-Math.PI/2},initialState:'open'}],
+  // The upright door contracts around its hinge when opened; it never rotates into the floor.
+  doors:[{id:'221b-entry',x:449,y:310,width:42,height:12,depthY:314,interactionRange:50,leafAsset:'bakerDoorLeaf',leaf:{x:428,y:310,width:42,height:62,originX:0,originY:1,closedRotation:0,openRotation:0},initialState:'open'}],
   exits:[rect('baker-street-exit',449,310,42,12,314)],
-  occlusion:[
-    {id:'armchair-left-front',asset:'bakerRoomProps',source:{x:130,y:220,width:294,height:143},x:37,y:155,width:58,height:32,depthY:190,display:{x:66,y:169,width:58,height:32}},
-    {id:'armchair-right-front',asset:'bakerRoomProps',source:{x:645,y:220,width:286,height:148},x:152,y:152,width:52,height:31,depthY:190,display:{x:178,y:168,width:52,height:31},flipX:true},
-    {id:'desk-front',asset:'bakerRoomProps',source:{x:54,y:580,width:454,height:158},x:74,y:235,width:96,height:34,depthY:268,display:{x:122,y:252,width:96,height:34}},
-    {id:'bookcase-front',asset:'bakerRoomProps',source:{x:1149,y:250,width:252,height:130},x:402,y:118,width:56,height:26,depthY:136,display:{x:430,y:125,width:56,height:26}},
-    {id:'lamp-table-front',asset:'bakerRoomProps',source:{x:650,y:880,width:300,height:138},x:104,y:182,width:36,height:16,depthY:198,display:{x:122,y:190,width:36,height:16}},
-  ],
+  // Whole furniture sprites sort at their ground contact: no duplicated, misaligned crops.
+  occlusion:[],
   propVisuals:[
     {id:'rug',asset:'bakerRoomProps',source:{x:980,y:710,width:550,height:314},display:{x:137.5,y:176,width:215,height:112},depthY:-17.5},
     {id:'armchair-left',asset:'bakerRoomProps',source:{x:130,y:58,width:294,height:310},display:{x:66,y:151,width:58,height:70},depthY:190},
     {id:'armchair-right',asset:'bakerRoomProps',source:{x:645,y:58,width:286,height:310},display:{x:178,y:151,width:52,height:64},depthY:190,flipX:true},
-    {id:'desk',asset:'bakerRoomProps',source:{x:54,y:384,width:454,height:354},display:{x:122,y:231,width:96,height:76},depthY:250},
+    {id:'desk',asset:'bakerRoomProps',source:{x:54,y:384,width:454,height:354},display:{x:122,y:231,width:96,height:76},depthY:268},
     {id:'desk-chair',asset:'bakerRoomProps',source:{x:672,y:396,width:220,height:342},display:{x:122,y:274,width:32,height:42},depthY:295},
     {id:'chemistry',asset:'bakerRoomProps',source:{x:1090,y:370,width:390,height:382},display:{x:353,y:231,width:58,height:42},depthY:254},
-    {id:'bookcase',asset:'bakerRoomProps',source:{x:1149,y:0,width:252,height:386},display:{x:430,y:100,width:56,height:76},depthY:119},
+    {id:'bookcase',asset:'bakerRoomProps',source:{x:1149,y:0,width:252,height:386},display:{x:430,y:100,width:56,height:76},depthY:136},
     {id:'violin-case',asset:'bakerRoomProps',source:{x:80,y:795,width:410,height:190},display:{x:211,y:127,width:50,height:24},depthY:139},
-    {id:'table-lamp',asset:'bakerRoomProps',source:{x:650,y:680,width:300,height:344},display:{x:122,y:179,width:36,height:38},depthY:193},
+    {id:'table-lamp',asset:'bakerRoomProps',source:{x:650,y:680,width:300,height:344},display:{x:122,y:179,width:36,height:38},depthY:198},
   ],
 };
 
@@ -114,4 +109,21 @@ export const PHYSICAL_ROOMS:Record<SceneId,PhysicalRoomDefinition>={
 
 export function roomSurfaceAt(room:PhysicalRoomDefinition,x:number,y:number):RoomSurface {
   return room.surfaces.find(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height)?.surface??room.defaultSurface;
+}
+
+/** All planar rooms collide at the actor's feet, independently of animation crop size. */
+export function isRoomGroundBlocked(room:PhysicalRoomDefinition,x:number,feetY:number,closedDoors:ReadonlySet<string>=new Set(),actorWidth=18,actorDepth=10):boolean {
+  const overlaps=(r:Footprint|DoorDefinition)=>x+actorWidth/2>r.x-r.width/2&&x-actorWidth/2<r.x+r.width/2&&feetY>r.y-r.height/2&&feetY-actorDepth<r.y+r.height/2;
+  if(x-actorWidth/2<0||x+actorWidth/2>room.width||feetY-actorDepth<0||feetY>room.height)return true;
+  return [...room.walls,...room.props,...room.doors.filter(d=>closedDoors.has(d.id))].some(overlaps);
+}
+export function resolveRoomSpawn(room:PhysicalRoomDefinition,position:{x:number;y:number},feetOffset=25.8):{x:number;y:number} {
+  if(!Number.isFinite(position.x)||!Number.isFinite(position.y))position={x:room.width/2,y:room.height/2};
+  const legal=(x:number,y:number)=>!isRoomGroundBlocked(room,x,y+feetOffset)&&Number.isFinite(x)&&Number.isFinite(y);
+  if(legal(position.x,position.y))return {...position};
+  for(let radius=4;radius<480;radius+=4)for(let i=0;i<32;i++){
+    const a=i*Math.PI/16,x=position.x+Math.cos(a)*radius,y=position.y+Math.sin(a)*radius;
+    if(legal(x,y))return {x,y};
+  }
+  return {x:room.width/2,y:room.height/2};
 }

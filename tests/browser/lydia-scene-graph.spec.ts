@@ -144,7 +144,7 @@ test('3D furniture groups and vertical collision acceptance views',async({page})
 test('standing volume clears the chair gap and stays out of bed, wardrobe, desk and washstand',async({page})=>{
   test.setTimeout(180_000);await page.setViewportSize({width:1440,height:810});
   await page.addInitScript(()=>window.addEventListener('misu:player-position',(event:any)=>{if(event.detail.scene==='lydia-room'){(window as any).__position=event.detail;(window as any).__samples??=[];(window as any).__samples.push(event.detail);}}));
-  const moveUntil=async(keys:string[],axis:'x'|'z',direction:-1|1,target:number)=>{await page.evaluate(()=>((window as any).__samples=[]));for(const key of keys)await page.keyboard.down(key);await page.waitForFunction(({axis,direction,target}:any)=>{const value=(window as any).__position?.worldPosition3D?.[axis];return typeof value==='number'&&(direction>0?value>target:value<target);},{axis,direction,target},{timeout:15000});for(const key of keys)await page.keyboard.up(key);await page.waitForTimeout(220);};
+  const moveUntil=async(keys:string[],axis:'x'|'z',direction:-1|1,target:number)=>{await page.evaluate(()=>((window as any).__samples=[]));for(const key of keys)await page.keyboard.down(key);try{await page.waitForFunction(({axis,direction,target}:any)=>{const value=(window as any).__position?.worldPosition3D?.[axis];return typeof value==='number'&&(direction>0?value>target:value<target);},{axis,direction,target},{timeout:15000});}catch(error){throw new Error(`Walk ${keys} to ${axis} ${target} failed at ${JSON.stringify(await page.evaluate(()=>(window as any).__position))}`,{cause:error});}for(const key of keys)await page.keyboard.up(key);await page.waitForTimeout(220);};
   const result=async()=>page.evaluate(()=>({position:(window as any).__position,samples:(window as any).__samples}));
   const clear=async()=>{const run=await result();expect(run.samples.every((sample:any)=>!sample.collisionAtPosition)).toBe(true);return run.position.worldPosition3D;};
 
@@ -152,9 +152,11 @@ test('standing volume clears the chair gap and stays out of bed, wardrobe, desk 
   await continueAt(page,4.65,1.5);await moveUntil(['s'],'z',1,3.0);at=await clear();expect(at.z).toBeGreaterThan(3.0); // Track the bed's west edge.
   await continueAt(page,4.65,2.1);await page.keyboard.down('d');await page.waitForFunction(()=>((window as any).__position?.lastMovementBlock?.id==='bed'),null,{timeout:15000});await page.keyboard.up('d');await page.waitForTimeout(220);at=await clear();expect(at.x).toBeLessThan(4.8); // Body stops before entering the bed.
   await continueAt(page,8.0,1.55);await moveUntil(['d'],'x',1,9.0);at=await clear();expect(at.x).toBeGreaterThan(9.0); // Close pass along the wardrobe.
-  await continueAt(page,1.88,2.1);await moveUntil(['s'],'z',1,3.5);at=await clear();expect(at.z).toBeGreaterThan(3.5); // Close pass beside the washstand.
+  await continueAt(page,1.98,2.1);await moveUntil(['s'],'z',1,3.5);at=await clear();expect(at.z).toBeGreaterThan(3.5); // Close pass beside the washstand.
 
-  await continueAt(page,1.9,4.95);await moveUntil(['d'],'x',1,7.2);at=await clear();expect(at.x).toBeLessThan(7.5);
-  await moveUntil(['w'],'z',-1,3.0);at=await clear();expect(at.z).toBeLessThan(3.0);
+  // Take the broad route west of the bed, then east across its open foot side.
+  // The narrow chair/desk gap is already verified independently at X=7.35 above.
+  await continueAt(page,1.9,4.95);await moveUntil(['d'],'x',1,3.1);at=await clear();expect(at.x).toBeLessThan(4.5);
+  await moveUntil(['w'],'z',-1,3.35);at=await clear();expect(at.z).toBeLessThan(3.35);
   await moveUntil(['d'],'x',1,8.0);at=await clear();expect(at.x).toBeGreaterThan(8.0); // Continuous lower-left to upper-right route.
 });

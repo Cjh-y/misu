@@ -12,6 +12,7 @@ async function continueAt(page:any,x:number,y:number){
   await page.reload();
   await page.getByRole('button',{name:/继续案件/}).click();
   await expect(page.locator('#scene-label')).toContainText('庄园走廊');
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   await page.waitForTimeout(300);
 }
 
@@ -45,14 +46,17 @@ test('Manor corridor rebuilt view, surfaces, lights and Lydia doorway transition
   await page.locator('#game canvas').screenshot({path:'screenshots/phase-1-11/11-doorway-threshold-close.png'});
   await continueAt(page,211,160);
   await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   await page.screenshot({path:'screenshots/phase-1-11/04-lydia-entry.png'});
 
   // Holmes stores his sprite center while Watson is authored by feetY; offset Holmes
   // by half his 51.6-unit height so both characters share the same floor-contact row.
+  await page.goto('/'); // Flush the live scene before seeding another room.
   await page.evaluate(()=>{const save=JSON.parse(localStorage.getItem('misu.save.v1')??'{}');save.state.currentScene='221b';save.state.playerPosition={x:244,y:140.2};save.state.storyFlags={...(save.state.storyFlags??{}),openingComplete:true};localStorage.setItem('misu.save.v1',JSON.stringify(save));});
   await page.setViewportSize({width:1440,height:640});
   await page.reload();await page.getByRole('button',{name:/继续案件/}).click();
   await expect(page.locator('#scene-label')).toContainText('221B');
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   await page.waitForTimeout(300);
   await page.locator('#game canvas').screenshot({path:'screenshots/phase-1-11/10-holmes-watson-side-by-side.png'});
 });
@@ -78,10 +82,13 @@ test('Manor and Lydia door return semantics remain unchanged',async({page})=>{
   await page.evaluate((state:any)=>localStorage.setItem('misu.save.v1',JSON.stringify({schemaVersion:1,caseId:'silver-whistle',savedAt:Date.now(),state})),bedroom);
   await page.reload();await page.getByRole('button',{name:/继续案件/}).click();
   await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
 
-  await page.evaluate((state:any)=>localStorage.setItem('misu.save.v1',JSON.stringify({schemaVersion:1,caseId:'silver-whistle',savedAt:Date.now(),state})),hallState(28,160));
+  await page.goto('/'); // Flush pagehide before writing the west-door fixture.
+  await page.evaluate((state:any)=>localStorage.setItem('misu.save.v1',JSON.stringify({schemaVersion:1,caseId:'silver-whistle',savedAt:Date.now(),state})),hallState(28,134));
   await page.reload();await page.getByRole('button',{name:/继续案件/}).click();
   await expect(page.locator('#nearby')).toContainText('返回贝克街',{timeout:8000});
   await page.keyboard.press('e');
   await expect(page.locator('#scene-label')).toContainText('贝克街',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
 });

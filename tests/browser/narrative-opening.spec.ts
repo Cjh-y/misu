@@ -3,20 +3,23 @@ import { expect, test } from '@playwright/test';
 async function startNewGame(page:any){
   await page.goto('/');
   await page.getByRole('button',{name:'开始调查'}).click();
-  for(let i=0;i<9;i++)await page.locator('.dialogue-box button').click();
+  for(let i=0;i<9;i++)await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
   await expect(page.locator('#scene-label')).toContainText('221B');
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
 }
 
-async function moveOnStick(page:any,dx:number,dy:number,milliseconds:number){
+async function moveOnStick(page:any,dx:number,dy:number,milliseconds:number,untilScene?:string){
   const bounds=await page.locator('.stick').boundingBox();
   if(!bounds)throw new Error('virtual joystick is unavailable');
   const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx*27,y+dy*27,{steps:3});
-  await page.waitForTimeout(milliseconds);await page.mouse.up();await page.waitForTimeout(500);
+  if(untilScene)await expect(page.locator('#scene-label')).toContainText(untilScene,{timeout:10000});else await page.waitForTimeout(milliseconds);await page.mouse.up();await page.waitForTimeout(500);
 }
 
-function saveAt(page:any,x:number,y:number){
+async function saveAt(page:any,x:number,y:number){
+  // Leave the running game first so its pagehide autosave cannot overwrite the fixture.
+  await page.goto('/');
   return page.evaluate(({x,y}:any)=>{const save=JSON.parse(localStorage.getItem('misu.save.v1')??'{}');save.state.playerPosition={x,y};localStorage.setItem('misu.save.v1',JSON.stringify(save));},{x,y});
 }
 
@@ -55,10 +58,10 @@ test('Title → New Game → 221B playable opening → Watson → investigation 
   const locked=await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.playerPosition);
   await page.keyboard.down('d');await page.waitForTimeout(350);await page.keyboard.up('d');await page.waitForTimeout(550);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.playerPosition)).toEqual(locked);
-  await page.locator('.dialogue-box button').click();
+  await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-box')).toContainText('华生');
   await page.screenshot({path:'screenshots/phase-1-10-1/03-watson-dialogue.png'});
-  for(let i=0;i<2;i++)await page.locator('.dialogue-box button').click();
+  for(let i=0;i<2;i++)await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.storyFlags.watsonSpoken)).toBe(true);
 
@@ -82,10 +85,12 @@ test('Title → New Game → 221B playable opening → Watson → investigation 
   await page.screenshot({path:'screenshots/phase-1-10-1/07-transition-location-card.png'});
   await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});
   await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   await page.screenshot({path:'screenshots/phase-1-10-1/08-manor-arrival.png'});
 
-  await moveOnStick(page,1,0,1300);
+  await moveOnStick(page,1,0,1300,'莉迪亚旧房');
   await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   await expect(page.locator('.touch-interact')).toHaveText('调查');
   await page.locator('.touch-interact').click();
   await expect(page.locator('.evidence-reveal h2')).toContainText('房门与窗锁');
@@ -101,7 +106,7 @@ test('mobile Continue preserves the opening and Watson touch interaction',async(
   await expect(page.locator('#nearby')).toContainText('华生',{timeout:8000});
   await page.locator('.touch-interact').click();
   await expect(page.locator('.dialogue-box')).toContainText('福尔摩斯');
-  for(let i=0;i<3;i++)await page.locator('.dialogue-box button').click();
+  for(let i=0;i<3;i++)await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
   await expect.poll(async()=>JSON.parse((await page.evaluate(()=>localStorage.getItem('misu.save.v1')))??'{}').state?.storyFlags?.watsonSpoken).toBe(true);
 });

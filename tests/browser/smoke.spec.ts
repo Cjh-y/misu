@@ -4,7 +4,7 @@ test('desktop: new game remains in 221B after opening and notebook/reasoning con
   await page.goto('/');
   await expect(page.getByRole('heading',{name:'谜溯'})).toBeVisible();
   await page.getByRole('button',{name:'开始调查'}).click();
-  for(let i=0;i<9;i++) await page.locator('.dialogue-box button').click();
+  for(let i=0;i<9;i++) await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
   await expect(page.locator('#scene-label')).toContainText('221B');
   await expect.poll(async()=>JSON.parse((await page.evaluate(()=>localStorage.getItem('misu.save.v1')))??'{}').state?.currentScene).toBe('221b');
@@ -31,7 +31,7 @@ test('mobile landscape: dialogue and touch controls fit without covering each ot
   await page.getByRole('button',{name:'开始调查'}).click();
   await expect(page.locator('.dialogue-box')).toBeVisible();
   await expect(page.locator('.touch-controls')).toBeHidden();
-  for(let i=0;i<9;i++) await page.locator('.dialogue-box button').click();
+  for(let i=0;i<9;i++) await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.touch-controls')).toBeVisible();
   const game=await page.locator('.game-frame').boundingBox();
   const joystick=await page.locator('.stick').boundingBox();
@@ -49,7 +49,7 @@ test('mobile portrait: controls remain reachable and touch can move the player',
   await page.setViewportSize({width:390,height:844});
   await page.goto('/');
   await page.getByRole('button',{name:'开始调查'}).click();
-  for(let i=0;i<9;i++) await page.locator('.dialogue-box button').click();
+  for(let i=0;i<9;i++) await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.touch-controls')).toBeVisible();
   const stick=page.locator('.stick');
   const rect=await stick.boundingBox();

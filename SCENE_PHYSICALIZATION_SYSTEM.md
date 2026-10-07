@@ -10,12 +10,29 @@ Room physicalization is configured in `src/game/rooms/physicalRooms.ts`.
 - one or more door instances, their pivot, collider, range, and initial state
 - interaction visibility and debug label
 
-Lydia and 221B use the same actor movement, axis sliding, collision checks, depth sorting,
-door animation/state, floor detection, lighting tint, foot shadows, and F3 debug renderer.
-Lydia uses its composite bedroom background plus extracted foreground crops. 221B uses a
-room-sized architectural base, an independent furniture atlas, selective configured foreground
-crops, a generated door leaf, and a localized southeast threshold patch. These presentation assets
-do not replace or modify the room's collision, surface, light, or door-state configuration.
+## Current collision authority (2026-10-07)
+
+221B and Manor Corridor use feet-anchored planar collision against `PhysicalRoomDefinition`.
+`isRoomGroundBlocked` checks an 18 × 10 footprint ending at the actor's feet, independently
+of animation frame dimensions. Movement slides on each axis in steps no larger than two
+logical pixels; frame delta is bounded to 150 ms. `resolveRoomSpawn` repairs illegal legacy
+save positions before rendering the actor. Arcade bodies remain available for inspection,
+but Arcade velocity does not drive player movement.
+
+221B's north wall covers the architectural wall band, including the window, rather than only
+the outer 16 pixels. The east wall leaves the southeast door opening clear. Closed doors
+participate in movement collision; closing a door through the actor is rejected. The upright
+221B door scales around its hinge when opened. Whole furniture sprites sort by floor contact;
+duplicated foreground crop overlays have been removed.
+
+Lydia uses `lydiaWorldRoom.ts` and its 3D scene graph as collision authority. Actor world X/Z,
+occupied volumes, clearance and logical depth are projected into the room view; pixel
+rectangles in `physicalRooms.ts` are not authoritative for this room. Movement subdivides
+world displacement into steps no larger than 0.06 units, and diagonal speed is normalized.
+
+All rooms share input locking, door state, surface feedback, lighting and contact shadows.
+Linear texture sampling and fractional camera coordinates avoid hard pixel snapping during
+movement. F3 inspects room collision; F4–F8 inspect Lydia's world projection and entities.
 
 ## Add a room
 
@@ -27,10 +44,6 @@ do not replace or modify the room's collision, surface, light, or door-state con
    depth anchor at the object's floor contact edge.
 5. Add any room-specific prop atlas frames to `propVisuals`; keep large furniture that needs
    depth sorting as independent sprites and put only architecture/fixed lighting in the room base.
-
-`WorldScene` retains two presentation-specific choices: Lydia uses the established 1.5x Holmes
-visual sprite and composite room background; the corridor keeps its existing fallback collision
-geometry because it is outside this phase. These do not affect how physical room definitions run.
 
 ## Browser verification
 

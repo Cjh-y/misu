@@ -1,12 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-async function move(page:any,keys:string[],milliseconds:number,settle=250){
-  for(const key of keys)await page.keyboard.down(key);
-  await page.waitForTimeout(milliseconds);
-  for(const key of keys)await page.keyboard.up(key);
-  await page.waitForTimeout(settle);
-}
-
 async function walkUntil(page:any,key:string,condition:(p:any)=>boolean){
   await page.keyboard.down(key);
   for(let step=0;step<180;step++){
@@ -28,7 +21,7 @@ async function closeEvidence(page:any){
 }
 
 test('New Game → Watson → manor → Lydia: investigate E06, E08 and E09, record, repeat and leave',async({page})=>{
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await page.setViewportSize({width:1440,height:810});
   await page.addInitScript(()=>{
     (window as any).__phase113Scenes=[];
@@ -41,33 +34,36 @@ test('New Game → Watson → manor → Lydia: investigate E06, E08 and E09, rec
   await page.goto('/');
   await page.getByRole('button',{name:'开始调查'}).click();
 
-  for(let i=0;i<9;i++)await page.locator('.dialogue-box button').click();
+  for(let i=0;i<9;i++)await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
   await expect(page.locator('#scene-label')).toContainText('221B');
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   await expect.poll(async()=>page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.dialogueProgress.opening)).toBe(9);
 
-  await move(page,['a'],550);
-  await move(page,['s'],300);
+  await walkUntil(page,'a',p=>p.x<=225);
+  await walkUntil(page,'s',p=>p.y>=157);
   await expect(page.locator('#nearby')).toContainText('华生',{timeout:8000});
   await page.screenshot({path:'screenshots/phase-1-12/01-watson-approach.png'});
   await page.keyboard.press('e');
   await expect(page.locator('.dialogue-box')).toContainText('福尔摩斯');
-  for(let i=0;i<3;i++)await page.locator('.dialogue-box button').click();
+  for(let i=0;i<3;i++)await page.locator('.dialogue-hitarea').click();
   await expect(page.locator('.dialogue-wrap')).toHaveCount(0);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.storyFlags.watsonSpoken)).toBe(true);
 
   // Walk the open floor route to the southeast exit and take the authored departure transition.
-  await walkUntil(page,'d',p=>p.x>=430);
+  await walkUntil(page,'d',p=>p.x>=440);
   await walkUntil(page,'s',p=>(p.feetY??p.y)>=300);
   await expect(page.locator('#nearby')).toContainText('前往庄园',{timeout:8000});
   await page.keyboard.press('e');
   await expect(page.locator('.transition-wrap')).toBeVisible();
   await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});
   await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
 
-  await move(page,['d'],1300);
+  await page.keyboard.down('d');await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:10000});await page.keyboard.up('d');
   await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
-  expect(await currentPosition(page)).toMatchObject({worldPosition3D:{x:1.2,y:0,z:3.75}});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
+  await expect.poll(()=>currentPosition(page)).toMatchObject({scene:'lydia-room',worldPosition3D:{x:1.2,y:0,z:3.75}});
   await expect(page.locator('#nearby')).toContainText('房门与窗锁',{timeout:8000});
   await page.screenshot({path:'screenshots/phase-1-12/02-bedroom-entry-e06-prompt.png'});
 
@@ -81,6 +77,7 @@ test('New Game → Watson → manor → Lydia: investigate E06, E08 and E09, rec
   // Go around the bed's east end, then approach the raised wall vent from open north floor.
   await walkUntil(page,'d',p=>p.worldPosition3D?.x>=6.75);
   await walkUntil(page,'w',p=>p.worldPosition3D?.z<=.65);
+  await walkUntil(page,'a',p=>p.worldPosition3D?.x<=6.95); // Refine the approach to the vent after rounding the bed.
   await expect(page.locator('#nearby'),`E08 approach at ${JSON.stringify(await currentPosition(page))}`).toContainText('通气孔与细密铁网',{timeout:8000});
   await page.screenshot({path:'screenshots/phase-1-12/04-e08-prompt.png'});
   await page.keyboard.press('e');
@@ -92,7 +89,7 @@ test('New Game → Watson → manor → Lydia: investigate E06, E08 and E09, rec
   // Circle around the bed's east end and cross its open south side to reach the rope.
   await walkUntil(page,'s',p=>p.worldPosition3D?.z>=3.4);
   await walkUntil(page,'a',p=>p.worldPosition3D?.x<=4.3);
-  await walkUntil(page,'d',p=>p.worldPosition3D?.x>=4.5);
+  await walkUntil(page,'d',p=>p.worldPosition3D?.x>=4.75);
   await expect(page.locator('#nearby'),`E09 approach at ${JSON.stringify(await currentPosition(page))}`).toContainText('床头假铃绳',{timeout:8000});
   await page.screenshot({path:'screenshots/phase-1-12/06-e09-prompt.png'});
   await page.keyboard.press('e');
@@ -121,12 +118,14 @@ test('New Game → Watson → manor → Lydia: investigate E06, E08 and E09, rec
   // Leave via the existing open west doorway, then re-enter and confirm evidence persists.
   await walkUntil(page,'a',p=>p.scene==='hall');
   await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   const persisted=await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.discoveredEvidence);
   for(const id of ['E06','E08','E09'])expect(persisted).toContain(id);
   await page.screenshot({path:'screenshots/phase-1-12/09-bedroom-exit-hall.png'});
 
-  await move(page,['d'],1300);
+  await page.keyboard.down('d');await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:10000});await page.keyboard.up('d');
   await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   const returned=await page.evaluate(()=>JSON.parse(localStorage.getItem('misu.save.v1')??'{}').state.discoveredEvidence);
   for(const id of ['E06','E08','E09'])expect(returned).toContain(id);
   await page.screenshot({path:'screenshots/phase-1-13/05-bedroom-first-reentry.png'});
@@ -135,9 +134,11 @@ test('New Game → Watson → manor → Lydia: investigate E06, E08 and E09, rec
   for(let reentry=2;reentry<=10;reentry++){
     await page.keyboard.down('a');
     await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
     await page.keyboard.up('a');
     await page.keyboard.down('d');
     await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
     await page.keyboard.up('d');
     if(reentry===10)await page.screenshot({path:'screenshots/phase-1-13/06-bedroom-tenth-reentry.png'});
   }

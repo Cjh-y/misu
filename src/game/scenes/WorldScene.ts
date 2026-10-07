@@ -6,7 +6,7 @@ import { SCENES_DATA } from '../../data/cases/silver-whistle/scenes';
 import { ART_ASSETS, WORLD_SCALE } from '../../data/art/assetManifest';
 import { INTERACTABLES } from '../../data/cases/silver-whistle/interactables';
 import { WATSON_ACTOR } from '../../data/cases/silver-whistle/roomNarrative';
-import { PHYSICAL_ROOMS, roomSurfaceAt, type PhysicalRoomDefinition, type RoomSurface, type DoorDefinition } from '../rooms/physicalRooms';
+import { PHYSICAL_ROOMS, roomSurfaceAt, isRoomGroundBlocked, resolveRoomSpawn, type PhysicalRoomDefinition, type RoomSurface, type DoorDefinition } from '../rooms/physicalRooms';
 import { LYDIA_CLOSED_DOOR, LYDIA_DOOR_WORLD, LYDIA_ENTRY_WORLD, LYDIA_EXIT_WORLD, LYDIA_FURNITURE_GROUPS, LYDIA_GROUND_FOOTPRINTS, LYDIA_PLAYER_COLLISION_VOLUME, LYDIA_PLAYER_FOOTPRINT, LYDIA_PROJECTION, LYDIA_ROOM_ARCHITECTURE, LYDIA_RUG_FOOTPRINT, LYDIA_SCENE_CAMERA, LYDIA_SCENE_GRAPH, LYDIA_WORLD_ENTITIES, LYDIA_WALL_MOUNTED, LYDIA_WORLD_ROOM, LYDIA_WORLD_INTERACTABLES, findLydiaCollision, isWithinGroundFootprint, lydiaDistanceXZ, resolveLydiaSpawn, type GroundFootprint, type LydiaCollisionHit } from '../world/lydiaWorldRoom';
 import type { WorldPosition3D } from '../world/WorldProjection';
 import { entityDepthKey, entityOcclusionRelation, entityVolume } from '../world/sceneGraph3D';
@@ -20,6 +20,8 @@ export class WorldScene extends Phaser.Scene {
   private current: SceneId = SCENES.BAKER_STREET;
   private positionClock = 0;
   private lightingClock = 0;
+  private footstepDistance = 0;
+  private pendingActions = new Set<string>();
   private actorFeetOffset = 0;
   private heroDisplayHeight = 51.6;
   private facing: 'south'|'north'|'east' = 'south';
@@ -93,22 +95,27 @@ export class WorldScene extends Phaser.Scene {
   create(initial?:{scene?:SceneId;position?:Point;worldPosition?:WorldPosition3D}){
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,E,J,K,ESC,F3,F4,F5,F6,F7,F8,O') as any;
-    this.input.keyboard!.on('keydown',(event:KeyboardEvent)=>{if(['F3','F4','F5','F6','F7','F8'].includes(event.code))event.preventDefault();});
+    this.input.keyboard!.on('keydown',(event:KeyboardEvent)=>{
+      const key=event.key.toUpperCase();
+      if(['F3','F4','F5','F6','F7','F8'].includes(key)){event.preventDefault();if(!event.repeat)this.pendingActions.add(key);}
+      else if(!this.uiBlocked&&!event.repeat&&['J','K','O'].includes(key))this.pendingActions.add(key);
+    });
     this.input.keyboard!.on('keydown-E',()=>{if(!this.uiBlocked)this.interact();});
-    this.input.on('keydown-ESC', () => window.dispatchEvent(new CustomEvent('misu:action', {detail:{action:'escape'}})));
-    this.cameras.main.setRoundPixels(true);
+    this.input.keyboard!.on('keydown-ESC', () => window.dispatchEvent(new CustomEvent('misu:action', {detail:{action:'escape'}})));
+    this.cameras.main.setRoundPixels(false);
     this.scale.off('resize',this.handleCameraResize);
     this.scale.on('resize',this.handleCameraResize);
-    this.events.off('virtual-input');
+    this.events.off('virtual-input');this.events.off('input-reset');
     this.events.off('interact');
     this.events.off('ui-blocked');
     this.events.off('set-scene');
     this.events.off('toggle-door');
     this.events.on('set-scene', (id:SceneId, position?:Point, worldPosition?:WorldPosition3D) => this.build(id, position, worldPosition));
     this.events.on('toggle-door',(doorId?:string)=>this.toggleNearbyDoor(doorId));
+    this.events.on('input-reset',()=>{this.virtual={x:0,y:0};this.input.keyboard?.resetKeys();});
     this.events.on('virtual-input', (v:{x:number;y:number}) => { if(!this.uiBlocked)this.virtual = v; });
     this.events.on('interact', () => this.interact());
-    this.events.on('ui-blocked', (blocked:boolean) => {this.uiBlocked=blocked;if(blocked){this.virtual={x:0,y:0};this.input.keyboard?.resetKeys();if(this.player?.body)(this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0,0);}});
+    this.events.on('ui-blocked', (blocked:boolean) => {this.uiBlocked=blocked;if(blocked){this.pendingActions.clear();this.virtual={x:0,y:0};this.input.keyboard?.resetKeys();if(this.player?.body)(this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0,0);}});
     this.events.on('open-notebook', () => window.dispatchEvent(new CustomEvent('misu:action', {detail:{action:'notebook'}})));
     this.build(initial?.scene??SCENES.BAKER_STREET,initial?.position??{x:160,y:176},initial?.worldPosition);
   }
@@ -124,7 +131,7 @@ export class WorldScene extends Phaser.Scene {
       this.physics.world.remove(body);
     }
     this.input.keyboard?.resetKeys();
-    this.virtual={x:0,y:0};
+    this.virtual={x:0,y:0};this.pendingActions.clear();
     this.current=id; this.children.removeAll(true);this.playerWorldPosition=undefined;
     this.holmesContactOuter=undefined; this.holmesContactInner=undefined; this.holmesCastShadow=undefined;
     this.watsonActor=undefined;this.watsonContactShadow=undefined;this.watsonCastShadow=undefined;
@@ -155,13 +162,16 @@ export class WorldScene extends Phaser.Scene {
     const initialWorldPosition=requestedWorldPosition?resolveLydiaSpawn(requestedWorldPosition):undefined;
     this.playerWorldPosition=initialWorldPosition;
     const initialScreen=id===SCENES.LYDIA_ROOM&&initialWorldPosition?LYDIA_PROJECTION.project(initialWorldPosition):undefined;
-    const initialRenderPoint=initialScreen??{x:position?.x??160,y:position?.y??176};
+    const initialRenderPoint=initialScreen??resolveRoomSpawn(this.physicalRoom!,position??{x:245,y:140});
     this.player=this.add.sprite(initialRenderPoint.x,initialRenderPoint.y,texture,frame);
     if(id===SCENES.LYDIA_ROOM)this.player.setOrigin(.5,1);
     if(usePhase16)this.player.setScale(heroHeight/this.player.frame.height);
     else this.player.setDisplaySize(WORLD_SCALE.character.width,WORLD_SCALE.character.height);
     if(!heroReady)this.player.setTint(0xb9aa8c);
     this.actorFeetOffset=id===SCENES.LYDIA_ROOM?0:usePhase16?heroHeight/2:0;
+    // The locked transition renders before movement resumes: initialize its final scale/depth now.
+    if(initialWorldPosition)this.player.setScale(heroHeight/this.player.frame.height*LYDIA_PROJECTION.scaleAt(initialWorldPosition.z));
+    this.player.setDepth(initialWorldPosition?entityDepthKey(initialWorldPosition,LYDIA_PROJECTION):this.player.y+this.actorFeetOffset);
     if(this.physicalRoom){
       const shadowScale=this.player.displayHeight/(id===SCENES.LYDIA_ROOM?64.8:51.6);
       this.holmesCastShadow=this.add.ellipse(this.player.x,this.player.y,25*shadowScale,5*shadowScale,0x111521,0.075);
@@ -174,14 +184,15 @@ export class WorldScene extends Phaser.Scene {
     if(usePhase16){
       this.syncPhase16PlayerFootprint();
     } else body.setSize(WORLD_SCALE.collision.width,WORLD_SCALE.collision.height).setOffset(3,WORLD_SCALE.collision.footOffsetY);
-    body.setCollideWorldBounds(id!==SCENES.LYDIA_ROOM);
+    body.setCollideWorldBounds(false);
+    body.moves=false;
     if(id===SCENES.LYDIA_ROOM){body.setVelocity(0,0);body.setSize(18,9,false);body.setOffset(this.player.frame.width/2-9,this.player.frame.height-9);}
-    this.cameras.main.startFollow(this.player,true,0.08,0.08);
+    this.cameras.main.startFollow(this.player,false,0.12,0.12);
     this.cameras.main.centerOn(this.player.x,this.player.y);
     this.physics.world.setBoundsCollision(true,true,true,true);
     this.physics.world.colliders.destroy();
     // Lydia's screen-rectangle mirrors are retired; its logical X/Z footprints below
-    // perform collision. Other rooms still use their existing Arcade rectangles.
+    // perform collision. Other rooms retain Arcade rectangles as diagnostic mirrors.
     const roomRects=id===SCENES.LYDIA_ROOM?[]:this.physicalRoom?.walls.length?[...this.physicalRoom.walls,...this.physicalRoom.props]:this.wallRects(id).map((r,i)=>({id:`wall-${i}`,x:r.x,y:r.y,width:r.w,height:r.h,depthY:r.y+r.h/2}));
     for(const rect of roomRects) {
       const obstacle=this.add.rectangle(rect.x,rect.y,rect.width,rect.height,0x15191e).setName(`collider:${rect.id}`);
@@ -258,10 +269,12 @@ export class WorldScene extends Phaser.Scene {
       if(!texture.has('physical-door-leaf'))texture.add('physical-door-leaf',0,736,636,80,148);
     }
     if(!textureKey)return undefined;
-    const leaf=this.add.image(config.x,config.y,textureKey,definition.leafAsset==='tileDoor'?'physical-door-leaf':undefined)
+    if(definition.leafAsset==='bakerDoorLeaf'&&!this.textures.get(textureKey).has('baker-leaf-upright'))this.textures.get(textureKey).add('baker-leaf-upright',0,264,63,487,1424);
+    const leaf=this.add.image(config.x,config.y,textureKey,definition.leafAsset==='tileDoor'?'physical-door-leaf':definition.leafAsset==='bakerDoorLeaf'?'baker-leaf-upright':undefined)
       .setDisplaySize(config.width,config.height).setOrigin(config.originX??.5,config.originY??.5)
       .setRotation(this.doorStates.get(definition.id)==='closed'?config.closedRotation:config.openRotation)
       .setDepth(definition.depthY).setName(`dynamic:${definition.id}`);
+    if(definition.leafAsset==='bakerDoorLeaf'&&this.doorStates.get(definition.id)==='open')leaf.scaleX*=.22;
     return leaf;
   }
   private toggleNearbyDoor(requestedId?:string){
@@ -269,19 +282,24 @@ export class WorldScene extends Phaser.Scene {
     const door=requestedId?room.doors.find(d=>d.id===requestedId):room.doors
       .filter(d=>this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition
         ?lydiaDistanceXZ(this.playerWorldPosition,LYDIA_DOOR_WORLD)<=d.interactionRange/42
-        :Math.hypot(this.player.x-d.x,this.player.y-d.y)<=d.interactionRange)
+        :Math.hypot(this.player.x-d.x,this.getPlayerFeetY()-d.y)<=d.interactionRange)
       .sort((a,b)=>this.current===SCENES.LYDIA_ROOM?0:
-        Math.hypot(this.player.x-a.x,this.player.y-a.y)-Math.hypot(this.player.x-b.x,this.player.y-b.y))[0];
+        Math.hypot(this.player.x-a.x,this.getPlayerFeetY()-a.y)-Math.hypot(this.player.x-b.x,this.getPlayerFeetY()-b.y))[0];
     if(door)this.toggleDoor(door);
   }
   private toggleDoor(door:DoorDefinition){
     const collider=this.doorColliders.get(door.id),leaf=this.doorLeaves.get(door.id),config=door.leaf;
-    if(!collider?.body||!leaf||!config||this.doorAnimating.has(door.id))return;
+    if(!collider?.body||!leaf||!config||this.doorAnimating.has(door.id)||this.uiBlocked)return;
     const current=this.doorStates.get(door.id)??door.initialState,closing=current==='open';
+    // Never close the leaf through a standing actor.
+    if(closing && (this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition
+      ? !!findLydiaCollision(this.playerWorldPosition,true)
+      : isRoomGroundBlocked(this.physicalRoom!,this.player.x,this.getPlayerFeetY(),new Set([door.id]))))return;
     this.doorStates.set(door.id,closing?'closing':'opening');this.doorAnimating.add(door.id);
     (collider.body as Phaser.Physics.Arcade.StaticBody).enable=closing;
     window.dispatchEvent(new CustomEvent('misu:door-state',{detail:{scene:this.current,doorId:door.id,state:closing?'closing':'opening'}}));
-    this.tweens.add({targets:leaf,rotation:closing?config.closedRotation:config.openRotation,duration:260,ease:'Sine.easeInOut',onComplete:()=>{
+    const motion=door.leafAsset==='bakerDoorLeaf'?{scaleX:(closing?1:.22)*config.width/leaf.frame.width}:{rotation:closing?config.closedRotation:config.openRotation};
+    this.tweens.add({targets:leaf,...motion,duration:260,ease:'Sine.easeInOut',onComplete:()=>{
       const state=closing?'closed':'open';this.doorStates.set(door.id,state);this.doorAnimating.delete(door.id);
       (collider.body as Phaser.Physics.Arcade.StaticBody).enable=closing;
       window.dispatchEvent(new CustomEvent('misu:door-state',{detail:{scene:this.current,doorId:door.id,state}}));
@@ -539,13 +557,13 @@ export class WorldScene extends Phaser.Scene {
   update(_time:number, delta:number){
     if(!this.player?.body) return;
     if(this.debugGraphics&&this.current===SCENES.LYDIA_ROOM){
-      if(Phaser.Input.Keyboard.JustDown(this.keys.F7)){
+      if(this.consumeAction('F7')){
         this.lydiaSchematicVisible=!this.lydiaSchematicVisible;
         this.lydiaSchematicGraphics?.setVisible(this.lydiaSchematicVisible);this.lydiaSchematicLabel?.setVisible(this.lydiaSchematicVisible);this.lydiaDeskSectionLabel?.setVisible(this.lydiaSchematicVisible);
         if(this.lydiaSchematicVisible)this.drawLydia3DSchematic();
         window.dispatchEvent(new CustomEvent('misu:world-schematic',{detail:{enabled:this.lydiaSchematicVisible,entities:LYDIA_WORLD_ENTITIES.length,wallMounted:LYDIA_WALL_MOUNTED.length}}));
       }
-      if(Phaser.Input.Keyboard.JustDown(this.keys.F8)){
+      if(this.consumeAction('F8')){
         this.lydiaPerspectiveVisible=!this.lydiaPerspectiveVisible;
         this.lydiaPerspectiveGraphics?.setVisible(this.lydiaPerspectiveVisible);this.lydiaPerspectiveLabel?.setVisible(this.lydiaPerspectiveVisible);
         for(const label of this.lydiaPerspectiveNames.values())label.setVisible(this.lydiaPerspectiveVisible);
@@ -554,9 +572,9 @@ export class WorldScene extends Phaser.Scene {
       }
       let layerChanged=false;
       for(const [key,layer] of [['F4','projection'],['F5','collision'],['F6','interaction']] as const){
-        if(Phaser.Input.Keyboard.JustDown(this.keys[key])){this.lydiaDebugLayers[layer]=!this.lydiaDebugLayers[layer];layerChanged=true;}
+        if(this.consumeAction(key)){this.lydiaDebugLayers[layer]=!this.lydiaDebugLayers[layer];layerChanged=true;}
       }
-      if(Phaser.Input.Keyboard.JustDown(this.keys.F3)){
+      if(this.consumeAction('F3')){
         this.debugGraphics.setVisible(!this.debugGraphics.visible);this.debugLabel?.setVisible(this.debugGraphics.visible);
         for(const label of this.debugNames.values())label.setVisible(this.debugGraphics.visible);
         window.dispatchEvent(new CustomEvent('misu:physics-debug',{detail:{enabled:this.debugGraphics.visible,layers:{...this.lydiaDebugLayers}}}));
@@ -564,22 +582,25 @@ export class WorldScene extends Phaser.Scene {
         this.drawLydiaWorldDebug(this.debugGraphics);
         window.dispatchEvent(new CustomEvent('misu:physics-debug',{detail:{enabled:true,layers:{...this.lydiaDebugLayers}}}));
       }
-    }else if(Phaser.Input.Keyboard.JustDown(this.keys.F3)&&this.debugGraphics){
+    }else if(this.consumeAction('F3')&&this.debugGraphics){
       this.debugGraphics.setVisible(!this.debugGraphics.visible);this.debugLabel?.setVisible(this.debugGraphics.visible);
       for(const label of this.debugNames.values())label.setVisible(this.debugGraphics.visible);
       window.dispatchEvent(new CustomEvent('misu:physics-debug',{detail:{enabled:this.debugGraphics.visible}}));
     }
-    if(Phaser.Input.Keyboard.JustDown(this.keys.O))this.toggleNearbyDoor();
+    if(!this.uiBlocked&&this.consumeAction('O'))this.toggleNearbyDoor();
     if(this.uiBlocked){(this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0,0);if(this.player.anims.isPlaying){this.player.anims.stop();this.setHolmesIdleFrame();}this.updateHolmesLighting();this.updateRoomFeedback();return;}
     let x=this.virtual.x,y=this.virtual.y;
     if(this.cursors.left.isDown||this.keys.A.isDown)x-=1;
     if(this.cursors.right.isDown||this.keys.D.isDown)x+=1;
     if(this.cursors.up.isDown||this.keys.W.isDown)y-=1;
     if(this.cursors.down.isDown||this.keys.S.isDown)y+=1;
-    const magnitude=Math.hypot(x,y); const length=magnitude||1;
+    const magnitude=Math.min(1,Math.hypot(x,y)); const length=Math.max(1,Math.hypot(x,y));
     const body=this.player.body as Phaser.Physics.Arcade.Body;
-    if(this.current===SCENES.LYDIA_ROOM)this.moveLydiaWorld(x/length*magnitude,y/length*magnitude,delta);
-    else body.setVelocity(x/length*92,y/length*92);
+    const oldX=this.player.x,oldY=this.player.y;
+    if(this.current===SCENES.LYDIA_ROOM)this.moveLydiaWorld(x/length,y/length,delta);
+    else this.movePlanarRoom(x/length,y/length,delta);
+    this.footstepDistance+=Math.hypot(this.player.x-oldX,this.player.y-oldY);
+    if(this.footstepDistance>=24){this.footstepDistance=0;window.dispatchEvent(new CustomEvent('misu:footstep',{detail:{surface:this.currentSurface??'WOOD'}}));}
     if(magnitude>0){
       this.facing=Math.abs(x)>Math.abs(y)?'east':y<0?'north':'south';
       this.player.setFlipX(this.facing==='east'&&x<0);
@@ -602,31 +623,50 @@ export class WorldScene extends Phaser.Scene {
     if(this.current===SCENES.LYDIA_ROOM){this.syncLydiaEntityDepths();if(this.lydiaSchematicVisible)this.drawLydia3DSchematic();}
     this.updateHolmesLighting();
     this.updateRoomFeedback();
-    if(Phaser.Input.Keyboard.JustDown(this.keys.J)) window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'notebook'}}));
-    if(Phaser.Input.Keyboard.JustDown(this.keys.K)) window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'reasoning'}}));
+    if(this.consumeAction('J')) window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'notebook'}}));
+    if(this.consumeAction('K')) window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'reasoning'}}));
     this.positionClock+=delta;
     this.lightingClock+=delta;
     if(this.physicalRoom&&this.lightingClock>=150){this.lightingClock=0;const influences=this.physicalRoom.lights.reduce((acc,light)=>{const d=Math.hypot(this.player.x-light.x,this.player.y-light.y),t=Math.max(0,1-d/light.radius),value=t*t*light.intensity;acc[light.kind]+=value;return acc;},{warm:0,cool:0});window.dispatchEvent(new CustomEvent('misu:light-response',{detail:{scene:this.current,warm:influences.warm,cool:influences.cool,tint:this.player.tintTopLeft}}));}
-    if(this.positionClock>=100){this.positionClock=0;const projectionScreen=this.playerWorldPosition?LYDIA_PROJECTION.project(this.playerWorldPosition):undefined;const collision=this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?findLydiaCollision(this.playerWorldPosition,this.doorStates.get('bedroom-entry')!=='open'):undefined;window.dispatchEvent(new CustomEvent('misu:player-position',{detail:{scene:this.current,x:this.player.x,y:this.player.y,feetY:this.getPlayerFeetY(),footAnchorScreen:this.current===SCENES.LYDIA_ROOM?{x:this.player.x,y:this.player.y}:undefined,projectionScreen:this.current===SCENES.LYDIA_ROOM?projectionScreen:undefined,worldDepthKey:this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):undefined,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,worldGroundFootprint:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_FOOTPRINT}:undefined,characterCollisionVolume:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_COLLISION_VOLUME}:undefined,collisionAtPosition:collision,lastMovementBlock:this.current===SCENES.LYDIA_ROOM?this.lastLydiaMovementBlock:undefined,inputLocked:this.uiBlocked,displayScale:{x:this.player.scaleX,y:this.player.scaleY},doorOpen:this.doorStates.get('bedroom-entry')==='open',body:{x:body.x,y:body.y,width:body.width,height:body.height}}}));
+    if(this.positionClock>=100){this.positionClock=0;const projectionScreen=this.playerWorldPosition?LYDIA_PROJECTION.project(this.playerWorldPosition):undefined;const collision=this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?findLydiaCollision(this.playerWorldPosition,this.doorStates.get('bedroom-entry')!=='open'):undefined;window.dispatchEvent(new CustomEvent('misu:player-position',{detail:{scene:this.current,x:this.player.x,y:this.player.y,feetY:this.getPlayerFeetY(),footAnchorScreen:this.current===SCENES.LYDIA_ROOM?{x:this.player.x,y:this.player.y}:undefined,projectionScreen:this.current===SCENES.LYDIA_ROOM?projectionScreen:undefined,worldDepthKey:this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):undefined,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,worldGroundFootprint:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_FOOTPRINT}:undefined,characterCollisionVolume:this.current===SCENES.LYDIA_ROOM?{...LYDIA_PLAYER_COLLISION_VOLUME}:undefined,collisionAtPosition:collision,lastMovementBlock:this.current===SCENES.LYDIA_ROOM?this.lastLydiaMovementBlock:undefined,inputLocked:this.uiBlocked,displayScale:{x:this.player.scaleX,y:this.player.scaleY},doorOpen:this.doorStates.get(this.current===SCENES.BAKER_STREET?'221b-entry':'bedroom-entry')==='open',body:{x:body.x,y:body.y,width:body.width,height:body.height}}}));
       const nearest=this.physicalRoom?.doors.map(d=>({door:d,distance:this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition
         ?lydiaDistanceXZ(this.playerWorldPosition,LYDIA_DOOR_WORLD)
-        :Math.hypot(this.player.x-d.x,this.player.y-d.y)})).filter(v=>v.distance<=(this.current===SCENES.LYDIA_ROOM?v.door.interactionRange/42:v.door.interactionRange)).sort((a,b)=>a.distance-b.distance)[0];
+        :Math.hypot(this.player.x-d.x,this.getPlayerFeetY()-d.y)})).filter(v=>v.distance<=(this.current===SCENES.LYDIA_ROOM?v.door.interactionRange/42:v.door.interactionRange)).sort((a,b)=>a.distance-b.distance)[0];
       window.dispatchEvent(new CustomEvent('misu:door-availability',{detail:{available:!!nearest,doorId:nearest?.door.id,state:nearest?this.doorStates.get(nearest.door.id):undefined}}));}
   }
+  private consumeAction(key:string){return this.pendingActions.delete(key);}
   private moveLydiaWorld(inputX:number,inputZ:number,delta:number){
     const current=this.playerWorldPosition;if(!current)return;
-    const speed=2.15,step=delta/1000;
+    const speed=2.15,step=Math.min(delta,150)/1000;
     const doorClosed=this.doorStates.get('bedroom-entry')==='closed'||this.doorStates.get('bedroom-entry')==='closing';
     this.lastLydiaMovementBlock=undefined;
-    const nextX={x:current.x+inputX*speed*step,z:current.z};
-    const blockX=findLydiaCollision(nextX,doorClosed);if(blockX)this.lastLydiaMovementBlock=blockX;else current.x=nextX.x;
-    const nextZ={x:current.x,z:current.z+inputZ*speed*step};
-    const blockZ=findLydiaCollision(nextZ,doorClosed);if(blockZ)this.lastLydiaMovementBlock=blockZ;else current.z=nextZ.z;
+    const substeps=Math.max(1,Math.ceil(speed*step/.06));
+    for(let i=0;i<substeps;i++){
+      const nextX={x:current.x+inputX*speed*step/substeps,z:current.z};
+      const blockX=findLydiaCollision(nextX,doorClosed);if(blockX)this.lastLydiaMovementBlock=blockX;else current.x=nextX.x;
+      const nextZ={x:current.x,z:current.z+inputZ*speed*step/substeps};
+      const blockZ=findLydiaCollision(nextZ,doorClosed);if(blockZ)this.lastLydiaMovementBlock=blockZ;else current.z=nextZ.z;
+    }
     current.y=0;
     const projected=LYDIA_PROJECTION.project(current);
     this.player.setPosition(projected.x,projected.y);
     const body=this.player.body as Phaser.Physics.Arcade.Body;
     body.setVelocity(0,0);body.updateFromGameObject();
+  }
+  private movePlanarRoom(inputX:number,inputY:number,delta:number){
+    const room=this.physicalRoom;if(!room)return;
+    const closed=new Set([...this.doorStates].filter(([,state])=>state==='closed'||state==='closing').map(([id])=>id));
+    const blocked=(x:number,y:number)=>{
+      if(isRoomGroundBlocked(room,x,y+this.actorFeetOffset,closed))return true;
+      return !!this.watsonActor&&Math.abs(x-WATSON_ACTOR.x)<14&&Math.abs(y+this.actorFeetOffset-WATSON_ACTOR.feetY)<9;
+    };
+    // Bounded substeps prevent tunnelling after a slow frame or a tab resume.
+    const distance=92*Math.min(delta,150)/1000,steps=Math.max(1,Math.ceil(distance/2));
+    for(let i=0;i<steps;i++){
+      const x=this.player.x+inputX*distance/steps;if(!blocked(x,this.player.y))this.player.x=x;
+      const y=this.player.y+inputY*distance/steps;if(!blocked(this.player.x,y))this.player.y=y;
+    }
+    const body=this.player.body as Phaser.Physics.Arcade.Body;body.setVelocity(0,0);body.updateFromGameObject();
   }
   private getPlayerFeetY(){return this.player.y+this.actorFeetOffset}
   private updateRoomFeedback(){
@@ -856,7 +896,7 @@ export class WorldScene extends Phaser.Scene {
     const dx=px-warmSource.x,dy=py-warmSource.y,length=Math.max(1,Math.hypot(dx,dy));
     const away=Math.max(0,1-length/Math.max(1,warmSource.radius));
     this.holmesCastShadow.setPosition(px+dx/length*(4+away*5),feetY+dy/length*(3+away*4));
-    const depth=py+hh;
+    const depth=this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?entityDepthKey(this.playerWorldPosition,LYDIA_PROJECTION):this.getPlayerFeetY();
     this.holmesCastShadow.setAlpha(0.035+away*0.055).setDepth(depth-0.3);
     this.holmesContactOuter.setPosition(px,feetY).setDepth(depth-0.2);
     this.holmesContactInner.setPosition(px,feetY).setDepth(depth-0.1);
@@ -864,7 +904,7 @@ export class WorldScene extends Phaser.Scene {
   private setHolmesIdleFrame(){
     if((this.current===SCENES.LYDIA_ROOM||this.current===SCENES.BAKER_STREET||this.current===SCENES.HALL)&&this.textures.exists('holmes-phase16')){
       this.player.setTexture('holmes-phase16',`holmes16-${this.facing}-idle`);
-      this.player.setScale(this.heroDisplayHeight/this.player.frame.height);
+      this.player.setScale(this.heroDisplayHeight/this.player.frame.height*(this.current===SCENES.LYDIA_ROOM&&this.playerWorldPosition?LYDIA_PROJECTION.scaleAt(this.playerWorldPosition.z):1));
       if(this.player.body&&this.current!==SCENES.LYDIA_ROOM)this.syncPhase16PlayerFootprint();
     }
     else if(this.textures.exists('holmes-sheet'))this.player.setTexture('holmes-sheet',`holmes-${this.facing}-0`);
@@ -877,5 +917,5 @@ export class WorldScene extends Phaser.Scene {
     body.updateBounds();
     body.setOffset(this.player.frame.width/2-9/sx,this.player.frame.height-10/sy);
   }
-  private interact(){ window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'interact',scene:this.current,x:this.player?.x,y:this.player?.y,worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,doorOpen:this.doorStates.get('bedroom-entry')==='open'}})); }
+  private interact(){ window.dispatchEvent(new CustomEvent('misu:action',{detail:{action:'interact',scene:this.current,x:this.player?.x,y:this.player?.y,feetY:this.getPlayerFeetY(),worldPosition3D:this.playerWorldPosition?{...this.playerWorldPosition}:undefined,doorOpen:this.doorStates.get(this.current===SCENES.BAKER_STREET?'221b-entry':'bedroom-entry')==='open'}})); }
 }

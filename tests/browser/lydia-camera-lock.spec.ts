@@ -33,7 +33,7 @@ test('Lydia camera-locked furniture follows one scene camera and sleeping group 
     expect(Math.abs(entity.displaySize.width/entity.displaySize.height-entity.sourceSize.width/entity.sourceSize.height)).toBeLessThan(.03);
   }
   await page.screenshot({path:'screenshots/phase-1-16/01-bedroom-camera-locked.png'});
-  await page.keyboard.press('F8');await page.waitForTimeout(100);
+  await page.keyboard.press('F8');await expect.poll(()=>page.evaluate(()=>(window as any).__perspective?.enabled)).toBe(true);
   const perspective=await page.evaluate(()=>((window as any).__perspective));
   expect(perspective.enabled).toBe(true);expect(perspective.entities).toHaveLength(7);
   expect(perspective.wallMounted).toHaveLength(2);

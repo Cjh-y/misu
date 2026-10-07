@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const stateAt=(scene:string,x:number,y:number)=>({
-  currentScene:scene,playerPosition:{x,y},discoveredEvidence:[],investigatedObjects:[],dialogueFlags:{},
+  currentScene:scene,playerPosition:{x,y},playerWorldPosition3D:scene==='lydia-room'?(y===30?{x:6.75,y:0,z:.6}:y===60?{x:4.55,y:0,z:3.4}:{x:1.2,y:0,z:3.75}):undefined,discoveredEvidence:[],investigatedObjects:[],dialogueFlags:{},
   storyFlags:{started:true,openingComplete:true},dialogueProgress:{opening:9},hypotheses:[],hypothesisState:{},
   unlockedLocations:['221b','hall','lydia-room'],
 });
@@ -38,7 +38,7 @@ test('221B fireplace and desk footprints block while open floor remains navigabl
   await loadRoom(page,'221b',104,145);
   await page.keyboard.down('w');await page.waitForTimeout(900);await page.keyboard.up('w');
   const fireplace=await latest(page);
-  expect(fireplace.y).toBeGreaterThan(112);
+  expect(fireplace.y+25.8).toBeGreaterThanOrEqual(122);
   await loadRoom(page,'221b',180,250);
   await page.keyboard.down('a');await page.waitForTimeout(500);await page.keyboard.up('a');
   const desk=await latest(page);
@@ -46,7 +46,7 @@ test('221B fireplace and desk footprints block while open floor remains navigabl
 });
 
 test('221B door state controls its threshold collision and permits the open passage',async({page})=>{
-  await loadRoom(page,'221b',449,280);
+  await loadRoom(page,'221b',449,260);
   await page.evaluate(()=>{(window as any).__door=[];window.addEventListener('misu:door-state',(e:any)=>(window as any).__door.push(e.detail.state));});
   await page.keyboard.press('o');await expect.poll(()=>page.evaluate(()=>(window as any).__door?.at(-1))).toBe('closed');
   await page.keyboard.down('s');await page.waitForTimeout(750);await page.keyboard.up('s');
@@ -93,7 +93,7 @@ test('221B warm, cool and dark zones produce distinct actor light responses',asy
 
 test('221B mobile view keeps interaction and doorway touch controls available',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await loadRoom(page,'221b',449,280);
+  await loadRoom(page,'221b',449,260);
   await expect(page.locator('.touch-interact')).toBeVisible();
   const door=page.locator('.touch-door');
   await expect(door).toBeVisible();

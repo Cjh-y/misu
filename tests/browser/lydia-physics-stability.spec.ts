@@ -12,6 +12,7 @@ async function continueAt(page:any,x:number,z:number){
   await page.evaluate((state:any)=>localStorage.setItem('misu.save.v1',JSON.stringify({schemaVersion:1,caseId:'silver-whistle',savedAt:Date.now(),state})),stateAt(x,z));
   await page.reload();await page.getByRole('button',{name:/继续案件/}).click();
   await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:10000});await page.waitForTimeout(250);
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
 }
 async function move(page:any,key:string,milliseconds=900){await page.keyboard.down(key);await page.waitForTimeout(milliseconds);await page.keyboard.up(key);await page.waitForTimeout(250);}
 async function live(page:any){return page.evaluate(()=>((window as any).__livePosition??{}));}
@@ -57,8 +58,8 @@ test('world footprints block the wardrobe and desk while preserving the floor ro
   await page.addInitScript(()=>window.addEventListener('misu:player-position',(event:any)=>((window as any).__livePosition={...event.detail})));
   await continueAt(page,8.0,.45);await move(page,'d',1400);
   expect((await live(page)).worldPosition3D.x).toBeLessThan(8.6);
-  await continueAt(page,8.5,3.7);await walkUntil(page,'s',p=>p.worldPosition3D?.z>=4.2);
-  const deskEdge=await live(page);expect(deskEdge.worldPosition3D.z).toBeLessThan(4.5);
+  await continueAt(page,8.35,4.8);await move(page,'w',1100);
+  const deskEdge=await live(page);expect(deskEdge.worldPosition3D.z).toBeGreaterThan(4.48);expect(deskEdge.lastMovementBlock?.id).toBe('desk');
   await continueAt(page,4.2,3.5);await walkUntil(page,'d',p=>p.worldPosition3D?.x>=7.0);
   expect((await live(page)).worldPosition3D.x).toBeGreaterThan(6.8);
 });
@@ -73,6 +74,7 @@ test('perspective display scale changes with depth while the world foot collisio
 });
 
 test('world coordinates survive ten room re-entries without camera, scale or foreground drift',async({page})=>{
+  test.setTimeout(120_000); // Twenty transitions now include their visible fade and location cue.
   await page.setViewportSize({width:1440,height:810});
   await page.addInitScript(()=>{
     (window as any).__roomSamples=[];
@@ -83,7 +85,9 @@ test('world coordinates survive ten room re-entries without camera, scale or for
   // The doorway is a scene boundary; each pass uses the same existing Hall transition.
   for(let i=0;i<10;i++){
     await page.keyboard.down('a');await expect(page.locator('#scene-label')).toContainText('庄园走廊',{timeout:8000});await page.keyboard.up('a');
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
     await page.keyboard.down('d');await expect(page.locator('#scene-label')).toContainText('莉迪亚旧房',{timeout:8000});await page.keyboard.up('d');
+  await expect(page.locator('.transition-wrap')).toHaveCount(0,{timeout:8000});
   }
   const samples=await page.evaluate(()=>((window as any).__roomSamples as any[]));
   expect(samples).toHaveLength(11);
@@ -142,8 +146,8 @@ test('bed depth comparison keeps collision clear and foreground ordering continu
   await page.setViewportSize({width:1440,height:810});
   await page.addInitScript(()=>window.addEventListener('misu:player-position',(event:any)=>((window as any).__livePosition={...event.detail})));
   const cases=[
-    {name:'behind',x:5.3,z:.48},
-    {name:'side',x:4.92,z:1.95},
+    {name:'behind',x:3.9,z:.35},
+    {name:'side',x:4.65,z:1.95},
     {name:'front',x:5.3,z:3.75},
   ];
   const positions=[] as any[];
