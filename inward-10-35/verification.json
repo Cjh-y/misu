@@ -1,0 +1,47 @@
+{
+  "duration_seconds": 40.0,
+  "width": 1280,
+  "height": 720,
+  "fps": "30/1",
+  "frames_decoded": 1200,
+  "video_codec": "h264",
+  "audio_codec": "aac",
+  "audio_channels": 2,
+  "minimum_mean_luma": 28.137870370370372,
+  "median_frame_difference": 7.203564643859863,
+  "max_frame_difference": 18.631620407104492,
+  "largest_motion_changes": [
+    {
+      "time": 13.833,
+      "mean_absolute_difference": 18.632
+    },
+    {
+      "time": 37.3,
+      "mean_absolute_difference": 18.615
+    },
+    {
+      "time": 13.867,
+      "mean_absolute_difference": 18.598
+    },
+    {
+      "time": 13.8,
+      "mean_absolute_difference": 18.563
+    },
+    {
+      "time": 13.767,
+      "mean_absolute_difference": 18.306
+    },
+    {
+      "time": 13.9,
+      "mean_absolute_difference": 18.281
+    },
+    {
+      "time": 13.733,
+      "mean_absolute_difference": 18.136
+    },
+    {
+      "time": 13.933,
+      "mean_absolute_difference": 18.022
+    }
+  ]
+}
